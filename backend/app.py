@@ -147,24 +147,25 @@ def reset_password():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    # This is where your AI logic goes. 
-    # I am providing a mock stream to match your frontend's expectations.
-    data = request.json
-    user_message = data.get('message', '')
-    
-    def generate():
-        # Mock response streaming
-        response_text = f"I am a mock AI. You said: '{user_message}'. To make this real, connect your OpenAI/Groq API in app.py."
-        words = response_text.split(' ')
-        for word in words:
-            # Format expected by frontend: data: {"delta": "..."}
-            yield f"data: {json.dumps({'delta': word + ' '})}\n\n"
-            time.sleep(0.05) # Simulate typing delay
+    try:
+        data = request.json
+        user_message = data.get('message', '')
         
-        yield "data: [DONE]\n\n"
-        
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+        def generate():
+            # Mock response streaming
+            response_text = f"I am a mock AI. You said: '{user_message}'. To make this real, connect your OpenAI/Groq API in app.py."
+            words = response_text.split(' ')
+            for word in words:
+                yield f"data: {json.dumps({'delta': word + ' '})}\n\n"
+                time.sleep(0.05)
+            
+            yield "data: [DONE]\n\n"
+            
+        return Response(stream_with_context(generate()), mimetype='text/event-stream')
+    except Exception as e:
+        print(f"CHAT ERROR: {e}") # This will show in your terminal
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Run on port 5001 locally
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)  
