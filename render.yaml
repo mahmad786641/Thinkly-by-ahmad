@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: thinkly-chatbot
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -k gthread -w 2 --threads 8 --timeout 120 -b 0.0.0.0:$PORT app:app"
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: DEMO_FALLBACK
+        value: "0"
+      - key: PYTHON_VERSION
+        value: "3.11.9"

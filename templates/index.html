@@ -1,0 +1,3570 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#6366f1" />
+<title>Thinkly — Assistant</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236366f1'/%3E%3Cpath d='M32 32h36v9H57v32h-14V41H32z' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f5f6fb;--bg-2:#eceefb;--surface:#fff;--surface-2:#fff;
+  --text:#101528;--muted:#6b7391;
+  --brand-1:#6366f1;--brand-2:#8b5cf6;--brand-rgb:99,102,241;
+  --stroke:rgba(15,23,42,.1);--stroke-soft:rgba(15,23,42,.06);
+  --bubble-bot:#fff;--bubble-bot-text:#1f2540;
+  --code-bg:#f3f4f8;--code-text:#1f2540;
+  --shadow-panel:0 20px 50px -20px rgba(15,23,42,.15);
+  --radius-xl:20px;--radius-lg:14px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:"SF Mono","Monaco","Menlo","Consolas",monospace;
+  --app-h:100dvh;
+  --sidebar-w:280px;
+}
+[data-theme="dark"]{
+  --bg:#0a0d1a;--bg-2:#0f1424;--surface:#161a2e;--surface-2:#161a2e;
+  --text:#e9edfb;--muted:#8b94b8;
+  --stroke:rgba(255,255,255,.1);--stroke-soft:rgba(255,255,255,.06);
+  --bubble-bot:#1e2338;--bubble-bot-text:#dfe4f7;
+  --code-bg:#0e1224;--code-text:#e9edfb;
+  --shadow-panel:0 20px 50px -20px rgba(0,0,0,.6);
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--text);
+  -webkit-font-smoothing:antialiased;overflow:hidden;position:fixed;
+  inset:0;width:100%;height:100%;
+  transition:background-color .4s,color .4s;
+}
+button,textarea,input,select{font:inherit;color:inherit;touch-action:manipulation}
+button{cursor:pointer;border:0;background:none}
+::selection{background:rgba(var(--brand-rgb),.35);color:#fff}
+
+/* ── aurora no longer runs (or paints) while hidden ───────── */
+.aurora-bg{
+  position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  opacity:0;visibility:hidden;
+  transition:opacity .6s,visibility .6s;
+}
+.aurora-bg.visible{opacity:1;visibility:visible}
+.aurora-bg:not(.visible) .aurora-blob{animation:none}
+.aurora-blob{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(80px);opacity:.35;animation:auroraFloat 18s ease-in-out infinite}
+.aurora-blob:nth-child(1){background:radial-gradient(circle,var(--brand-1),transparent 70%);top:-20%;left:-10%}
+.aurora-blob:nth-child(2){background:radial-gradient(circle,#a855f7,transparent 70%);top:20%;right:-15%;animation-delay:-6s}
+.aurora-blob:nth-child(3){background:radial-gradient(circle,#06b6d4,transparent 70%);bottom:-20%;left:20%;animation-delay:-12s}
+@keyframes auroraFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(8%,-6%) scale(1.15)}66%{transform:translate(-6%,8%) scale(.92)}}
+
+.stage{
+  position:relative;height:var(--app-h);width:100%;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+  background:linear-gradient(180deg,var(--bg),var(--bg-2));
+  overflow:hidden;z-index:1;
+}
+.app{
+  position:relative;
+  display:grid;
+  grid-template-columns:var(--sidebar-w) minmax(0,1fr);
+  width:min(1240px,100%);
+  height:min(880px,calc(var(--app-h) - 48px));
+  gap:16px;
+  direction:ltr;
+  transition:grid-template-columns .3s var(--ease),gap .3s var(--ease);
+}
+.app.is-collapsed{grid-template-columns:0 minmax(0,1fr);gap:0}
+
+.sidebar{
+  grid-column:1;
+  position:relative;
+  display:flex;flex-direction:column;
+  border-radius:var(--radius-xl);
+  border:1px solid var(--stroke);
+  background:var(--surface-2);
+  box-shadow:var(--shadow-panel);
+  overflow:hidden;
+  transition:opacity .25s var(--ease),border-color .25s var(--ease);
+  min-width:0;
+}
+.app.is-collapsed .sidebar{opacity:0;pointer-events:none;border-color:transparent}
+.sidebar__head{
+  padding:16px 18px 12px;
+  border-bottom:1px solid var(--stroke-soft);
+  display:flex;align-items:center;gap:10px;
+}
+.sidebar__brand{
+  display:flex;align-items:center;gap:10px;
+  font-weight:700;font-size:14.5px;flex:1;min-width:0;
+}
+.sidebar__brand svg{width:22px;height:22px;flex:none;border-radius:6px}
+.sidebar__search{padding:10px 14px 4px;position:relative}
+.search-input{
+  width:100%;padding:10px 12px 10px 36px;
+  border-radius:10px;border:1px solid var(--stroke);
+  background:var(--bg);font-size:13px;outline:none;min-height:40px;
+}
+.search-input:focus{border-color:var(--brand-1);box-shadow:0 0 0 3px rgba(var(--brand-rgb),.12)}
+.search-icon{
+  position:absolute;left:24px;top:50%;transform:translateY(-30%);
+  width:15px;height:15px;color:var(--muted);pointer-events:none;
+}
+.search-clear{
+  position:absolute;right:22px;top:50%;transform:translateY(-30%);
+  width:24px;height:24px;display:none;place-items:center;border-radius:50%;color:var(--muted);
+}
+.search-clear.visible{display:grid}
+.search-clear:hover{background:rgba(var(--brand-rgb),.12);color:var(--brand-1)}
+.search-empty{padding:24px 16px;text-align:center;color:var(--muted);font-size:13px}
+.sidebar__toolbar{display:flex;gap:6px;padding:6px 14px 4px;align-items:center}
+.toolbar-btn{
+  padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:600;
+  color:var(--muted);border:1px solid var(--stroke);background:transparent;
+  transition:all .15s;display:flex;align-items:center;gap:4px;min-height:32px;
+}
+.toolbar-btn:hover{color:var(--brand-1);border-color:rgba(var(--brand-rgb),.4);background:rgba(var(--brand-rgb),.06)}
+.toolbar-btn.active{background:var(--brand-1);color:#fff;border-color:var(--brand-1)}
+.toolbar-btn svg{width:12px;height:12px}
+.toolbar-spacer{flex:1}
+.new-chat-btn{
+  display:flex;align-items:center;gap:10px;
+  margin:10px 18px 8px;padding:12px 14px;border-radius:12px;
+  font-size:13.5px;font-weight:600;color:#fff;background:var(--brand-1);
+  transition:background-color .2s,transform .2s,box-shadow .2s;
+  min-height:44px;position:relative;overflow:hidden;
+}
+.new-chat-btn:hover{background:var(--brand-2);box-shadow:0 8px 20px -8px rgba(var(--brand-rgb),.6)}
+.new-chat-btn svg{width:15px;height:15px;transition:transform .3s var(--ease)}
+.new-chat-btn:hover svg{transform:rotate(90deg)}
+.conv-list{flex:1;overflow-y:auto;padding:4px 12px 16px}
+.conv-list::-webkit-scrollbar{width:5px}
+.conv-list::-webkit-scrollbar-thumb{background:var(--stroke);border-radius:99px}
+.conv-group{
+  font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);padding:14px 8px 6px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;
+}
+.conv-group::after{
+  content:'';width:0;height:0;
+  border-left:4px solid transparent;border-right:4px solid transparent;
+  border-top:5px solid var(--muted);
+  margin-left:auto;transition:transform .2s;
+}
+.conv-group.collapsed::after{transform:rotate(-90deg)}
+.conv-group.collapsed + .conv-group-items{display:none}
+.conv-group-items{display:contents}
+.conv-item{
+  position:relative;display:flex;align-items:center;gap:10px;
+  padding:10px;border-radius:10px;cursor:pointer;margin-bottom:2px;
+  color:var(--text);background:transparent;border:1px solid transparent;
+  transition:background-color .2s,border-color .2s,transform .2s var(--ease);
+  min-height:44px;
+}
+.conv-item:hover{background:rgba(var(--brand-rgb),.06);border-color:rgba(var(--brand-rgb),.1);transform:translateX(2px)}
+.conv-item.active{background:rgba(var(--brand-rgb),.1);border-color:rgba(var(--brand-rgb),.2);color:var(--brand-1);font-weight:600}
+.conv-item.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--brand-1)}
+.conv-item__icon{
+  width:30px;height:30px;flex:none;display:grid;place-items:center;
+  border-radius:8px;background:rgba(var(--brand-rgb),.1);color:var(--brand-1);position:relative;
+}
+.conv-item.active .conv-item__icon{background:var(--brand-1);color:#fff}
+.conv-item__icon svg{width:15px;height:15px}
+.conv-item__colorbar{position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:2px}
+.conv-item__star{position:absolute;top:-3px;right:-3px;width:14px;height:14px;background:var(--surface);border-radius:50%;display:grid;place-items:center}
+.conv-item__star svg{width:9px;height:9px;color:#f59e0b;fill:#f59e0b}
+.conv-item__body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.conv-item__title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;font-weight:600;line-height:1.35}
+.conv-item.active .conv-item__title{color:var(--brand-1)}
+.conv-item__meta{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px}
+.conv-item__time{font-size:10.5px;color:var(--muted);font-weight:500}
+.conv-item__count{
+  font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;
+  background:rgba(var(--brand-rgb),.1);color:var(--brand-1);min-width:20px;text-align:center;
+}
+mark.highlight{background:rgba(250,204,21,.4);color:inherit;border-radius:2px;padding:0 2px}
+.conv-item__rename{width:100%;padding:6px 8px;border-radius:7px;border:1.5px solid var(--brand-1);background:var(--surface);font-size:14px;font-weight:600;color:var(--text);outline:0}
+.conv-item__actions{display:flex;gap:2px;opacity:0;transition:opacity .15s;flex:none;align-self:center}
+.conv-item:hover .conv-item__actions,.conv-item.active .conv-item__actions{opacity:1}
+.conv-item__action{
+  width:26px;height:26px;display:grid;place-items:center;border-radius:6px;
+  color:var(--muted);transition:background-color .15s,color .15s;
+}
+.conv-item__action svg{width:12px;height:12px}
+.conv-item__action:hover{background:rgba(var(--brand-rgb),.12);color:var(--brand-1)}
+.conv-item__action--del:hover{background:rgba(239,68,68,.12);color:#ef4444}
+.user-profile{
+  padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));
+  border-top:1px solid var(--stroke-soft);
+  display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);
+}
+.user-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-status{font-size:10px;color:var(--muted)}
+.logout-btn{color:#ef4444;padding:8px;border-radius:8px;min-width:44px;min-height:44px;display:grid;place-items:center}
+.logout-btn:hover{background:rgba(239,68,68,.1)}
+.logout-btn svg{width:18px;height:18px}
+
+.chat{
+  grid-column:2;position:relative;min-width:0;
+  display:flex;flex-direction:column;
+  border-radius:var(--radius-xl);border:1px solid var(--stroke);
+  background:var(--surface-2);box-shadow:var(--shadow-panel);overflow:hidden;
+}
+.chat__header{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 18px;border-bottom:1px solid var(--stroke-soft);
+  position:relative;z-index:2;flex-shrink:0;
+}
+.identity{display:flex;align-items:center;gap:12px;min-width:0}
+.avatar{
+  position:relative;display:grid;place-items:center;
+  width:42px;height:42px;flex:none;border-radius:13px;color:#fff;background:var(--brand-1);
+}
+.avatar svg{width:24px;height:24px}
+.avatar.thinking{animation:think-pulse 1.4s ease-in-out infinite}
+@keyframes think-pulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--brand-rgb),.55)}50%{box-shadow:0 0 0 10px rgba(var(--brand-rgb),0)}}
+.identity__name{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.identity__name>span:first-child{
+  background:linear-gradient(90deg,var(--brand-1),var(--brand-2),#06b6d4,var(--brand-1));
+  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:gradient-text 5s linear infinite;
+}
+@keyframes gradient-text{from{background-position:300% 0}to{background-position:-300% 0}}
+.badge{
+  font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 7px;border-radius:999px;color:var(--brand-1);
+  background:rgba(var(--brand-rgb),.12);border:1px solid rgba(var(--brand-rgb),.28);
+}
+.badge.badge--guest{color:#f59e0b;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.28)}
+.identity__status{margin:3px 0 0;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:#10b981;animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.6)}50%{opacity:.85;box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+.header-actions{display:flex;align-items:center;gap:6px}
+.icon-btn{
+  position:relative;display:grid;place-items:center;
+  width:40px;height:40px;flex:none;border-radius:10px;
+  color:var(--muted);border:1px solid var(--stroke);background:transparent;
+  transition:color .2s,background .2s,border-color .2s;
+}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn:hover{color:var(--brand-1);background:var(--surface);border-color:rgba(var(--brand-rgb),.3)}
+.icon-btn:active{transform:scale(.95)}
+.settings-wrap{position:relative}
+.settings-dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;min-width:260px;
+  max-height:75vh;overflow-y:auto;padding:6px;
+  background:var(--surface);border:1px solid var(--stroke);border-radius:12px;
+  box-shadow:var(--shadow-panel);opacity:0;pointer-events:none;transform:translateY(-8px);
+  transition:opacity .2s,transform .2s;z-index:50;
+}
+.settings-dropdown.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.settings-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:10px 12px;border-radius:8px;font-size:13px;font-weight:500;
+  text-align:left;color:var(--text);transition:background .15s;
+}
+.settings-item:hover{background:rgba(var(--brand-rgb),.08);color:var(--brand-1)}
+.settings-item svg{width:15px;height:15px;flex:none;color:var(--muted)}
+.settings-item:hover svg{color:var(--brand-1)}
+.settings-item .kbd-hint{margin-left:auto;font-size:10px;color:var(--muted);border:1px solid var(--stroke);padding:1px 5px;border-radius:4px}
+.settings-item .sw{
+  margin-left:auto;width:32px;height:18px;border-radius:999px;
+  background:var(--stroke);position:relative;transition:background .2s;
+}
+.settings-item .sw::after{
+  content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:transform .2s;
+}
+.settings-item .sw.on{background:var(--brand-1)}
+.settings-item .sw.on::after{transform:translateX(14px)}
+.settings-sep{height:1px;background:var(--stroke-soft);margin:4px 6px}
+.settings-label{
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);padding:8px 12px 4px;
+}
+.accent-picker{display:flex;gap:8px;padding:6px 10px 10px;flex-wrap:wrap}
+.accent-swatch{
+  width:26px;height:26px;border-radius:50%;border:2px solid transparent;
+  transition:transform .15s,border-color .15s;cursor:pointer;
+}
+.accent-swatch:hover{transform:scale(1.15)}
+.accent-swatch.active{border-color:var(--text);transform:scale(1.15)}
+
+/* ── no -webkit-overflow-scrolling (blurs text on iOS) ────── */
+.chat__body{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:20px 18px 10px;display:flex;flex-direction:column;gap:14px;
+  scroll-behavior:smooth;position:relative;
+}
+.chat__body::-webkit-scrollbar{width:7px}
+.chat__body::-webkit-scrollbar-thumb{background:rgba(var(--brand-rgb),.25);border-radius:99px}
+/* ── fill-mode "backwards" so no lingering transform layer ── */
+.msg{display:flex;align-items:flex-start;gap:10px;max-width:82%;position:relative;animation:msgIn .4s var(--ease) backwards}
+.msg--bot{align-self:flex-start;animation-name:msgInBot}
+.msg--user{align-self:flex-end;flex-direction:row-reverse;animation-name:msgInUser}
+@keyframes msgInBot{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes msgInUser{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+.msg__avatar{
+  width:28px;height:28px;flex:none;display:grid;place-items:center;
+  border-radius:9px;color:#fff;background:var(--brand-1);margin-top:2px;
+}
+.msg__avatar svg{width:17px;height:17px}
+.bubble{
+  position:relative;padding:12px 16px;border-radius:var(--radius-lg);
+  font-size:15px;line-height:1.6;word-wrap:break-word;overflow-wrap:anywhere;
+  max-height:420px;overflow-y:auto;min-width:60px;min-height:20px;
+}
+.bubble--bot{color:var(--bubble-bot-text);background:var(--bubble-bot);border:1px solid var(--stroke);border-bottom-left-radius:6px}
+.bubble--bot.error{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35);color:#b91c1c}
+.bubble--user{color:#fff;background:var(--brand-1);border-bottom-right-radius:6px;white-space:pre-wrap}
+.msg-attachments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.msg-attachment{border-radius:8px;overflow:hidden;border:1px solid var(--stroke);max-width:200px}
+.msg-attachment img{display:block;max-width:200px;max-height:200px}
+.bubble--user .msg-attachment{border-color:rgba(255,255,255,.3)}
+.msg-actions{display:flex;gap:2px;margin-top:6px;opacity:0;transition:opacity .2s;height:0;overflow:hidden;flex-wrap:wrap}
+.msg--bot:hover .msg-actions{opacity:1;height:auto}
+.msg-action{
+  display:grid;place-items:center;width:28px;height:28px;border-radius:6px;
+  color:var(--muted);transition:background .15s,color .15s;font-size:13px;
+}
+.msg-action svg{width:13px;height:13px}
+.msg-action:hover{background:rgba(var(--brand-rgb),.12);color:var(--brand-1)}
+.msg-action.active{color:var(--brand-1);background:rgba(var(--brand-rgb),.14)}
+.msg-action.tts-active{color:#ef4444;background:rgba(239,68,68,.12)}
+.msg__stats{display:flex;gap:6px;font-size:10px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.msg__stats span{background:rgba(var(--brand-rgb),.06);padding:2px 6px;border-radius:4px}
+.msg.starred .bubble--bot{border-color:rgba(250,204,21,.6);box-shadow:0 0 0 1px rgba(250,204,21,.3)}
+.branch-nav{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:6px;padding-left:38px}
+.branch-nav button{width:20px;height:20px;border-radius:4px;display:grid;place-items:center;color:var(--muted)}
+.branch-nav button:hover{background:rgba(var(--brand-rgb),.1);color:var(--brand-1)}
+.branch-nav button svg{width:11px;height:11px}
+.bubble--bot p{margin:0 0 10px}
+.bubble--bot p:last-child{margin-bottom:0}
+.bubble--bot strong{font-weight:700;color:var(--text)}
+.bubble--bot a{color:var(--brand-1);text-decoration:underline}
+.bubble--bot ul,.bubble--bot ol{margin:6px 0 10px;padding-left:22px}
+.bubble--bot li{margin:3px 0}
+.bubble--bot ul li{list-style:disc}
+.bubble--bot ol li{list-style:decimal}
+.bubble--bot h1,.bubble--bot h2,.bubble--bot h3{margin:10px 0 6px;font-weight:700;line-height:1.3}
+.bubble--bot h1{font-size:17px}.bubble--bot h2{font-size:16px}.bubble--bot h3{font-size:15px}
+.bubble--bot hr{border:0;height:1px;background:var(--stroke);margin:12px 0}
+.bubble--bot blockquote{
+  margin:8px 0;padding:6px 12px;
+  border-left:3px solid var(--brand-1);background:rgba(var(--brand-rgb),.06);
+  border-radius:4px;color:var(--muted);
+}
+.bubble--bot code:not(.code-block code){
+  font-family:var(--mono);font-size:.88em;padding:2px 6px;border-radius:5px;
+  background:var(--code-bg);color:var(--brand-2);border:1px solid var(--stroke);
+}
+.bubble--bot table.md-table{
+  width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;
+  display:block;overflow-x:auto;
+}
+.bubble--bot table.md-table th,.bubble--bot table.md-table td{
+  padding:6px 10px;border:1px solid var(--stroke);text-align:left;white-space:nowrap;
+}
+.bubble--bot table.md-table th{background:rgba(var(--brand-rgb),.08);font-weight:700}
+.code-block{position:relative;margin:10px 0;border-radius:10px;background:var(--code-bg);border:1px solid var(--stroke);overflow:hidden}
+.code-block__head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 10px 6px 14px;background:rgba(0,0,0,.03);
+  border-bottom:1px solid var(--stroke);font-size:11px;color:var(--muted);
+  font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+}
+[data-theme="dark"] .code-block__head{background:rgba(255,255,255,.03)}
+.code-block__copy{
+  display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:6px;
+  font-size:11px;font-weight:600;color:var(--muted);text-transform:none;min-height:32px;
+}
+.code-block__copy:hover{background:rgba(var(--brand-rgb),.12);color:var(--brand-1)}
+.code-block pre{margin:0;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--code-text)}
+.code-block pre code .tok-kw{color:#c084fc;font-weight:600}
+.code-block pre code .tok-str{color:#86efac}
+.code-block pre code .tok-num{color:#fbbf24}
+.code-block pre code .tok-com{color:#6b7391;font-style:italic}
+.code-block pre code .tok-fn{color:#60a5fa}
+[data-theme="light"] .code-block pre code .tok-kw{color:#7c3aed}
+[data-theme="light"] .code-block pre code .tok-str{color:#059669}
+[data-theme="light"] .code-block pre code .tok-num{color:#d97706}
+[data-theme="light"] .code-block pre code .tok-fn{color:#2563eb}
+.typing{display:flex;align-items:center;gap:5px;padding:3px 2px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--brand-1);animation:dot-bounce 1.4s infinite ease-in-out}
+.typing span:nth-child(2){animation-delay:.16s}
+.typing span:nth-child(3){animation-delay:.32s}
+@keyframes dot-bounce{0%,62%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+.suggestions{display:flex;gap:6px;padding:8px 38px 0;flex-wrap:wrap}
+.suggestion-chip{
+  padding:6px 12px;border-radius:999px;
+  background:rgba(var(--brand-rgb),.08);border:1px solid rgba(var(--brand-rgb),.2);
+  color:var(--brand-1);font-size:12px;font-weight:500;
+}
+.suggestion-chip:hover{background:rgba(var(--brand-rgb),.15)}
+.scroll-top-btn{
+  position:absolute;bottom:20px;right:20px;width:40px;height:40px;border-radius:50%;
+  background:var(--surface);border:1px solid var(--stroke);color:var(--brand-1);
+  display:grid;place-items:center;box-shadow:var(--shadow-panel);
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10;
+}
+.scroll-top-btn.show{opacity:1;pointer-events:auto}
+.scroll-top-btn:hover{transform:translateY(-2px)}
+.scroll-top-btn svg{width:16px;height:16px}
+
+.composer{
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
+  border-top:1px solid var(--stroke-soft);position:relative;flex-shrink:0;
+  background:var(--surface-2);
+}
+.attach-preview{display:none;gap:8px;padding:4px 6px 10px;flex-wrap:wrap}
+.attach-preview.visible{display:flex}
+.attach-item{position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px solid var(--stroke);background:var(--bg)}
+.attach-item img{width:100%;height:100%;object-fit:cover;display:block}
+.attach-item__remove{
+  position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
+  background:rgba(15,23,42,.7);color:#fff;display:grid;place-items:center;
+}
+.attach-item__remove:hover{background:#ef4444}
+.attach-item__remove svg{width:10px;height:10px}
+.token-counter{
+  position:absolute;top:-22px;right:16px;font-size:10.5px;color:var(--muted);
+  background:var(--surface);padding:2px 8px;border-radius:6px;
+  border:1px solid var(--stroke);font-weight:600;display:none;
+}
+.token-counter.show{display:block}
+.composer__inner{
+  position:relative;display:flex;align-items:flex-end;gap:6px;padding:6px;
+  border-radius:22px;border:1px solid var(--stroke);background:var(--surface);
+  transition:border-color .2s,box-shadow .2s;
+}
+.composer__inner:focus-within{border-color:rgba(var(--brand-rgb),.55);box-shadow:0 0 0 3px rgba(var(--brand-rgb),.12)}
+.composer__inner.listening{border-color:rgba(239,68,68,.5);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
+.composer textarea{
+  flex:1;min-height:26px;max-height:140px;padding:10px 4px;
+  border:0;outline:0;resize:none;background:transparent;
+  font-size:16px;line-height:1.45;color:var(--text);font-family:inherit;
+}
+.composer textarea::placeholder{color:var(--muted);opacity:.7}
+.attach-btn,.mic-btn,.send-btn,.stop-btn,.emoji-btn,.pause-btn{
+  position:relative;display:grid;place-items:center;
+  width:40px;height:40px;flex:none;border-radius:50%;
+  transition:background .2s,border-color .2s,color .2s;
+}
+.attach-btn,.mic-btn,.emoji-btn{color:var(--muted);background:transparent;border:1px solid var(--stroke)}
+.attach-btn svg,.mic-btn svg,.emoji-btn svg{width:17px;height:17px}
+.attach-btn:hover,.mic-btn:hover,.emoji-btn:hover{color:var(--brand-1);background:var(--surface)}
+.mic-btn.listening{color:#fff;background:#ef4444;border-color:transparent;animation:micPulse 1.2s infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.6)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.send-btn{color:#fff;background:var(--brand-1)}
+.send-btn svg{width:18px;height:18px}
+.send-btn:hover:not(:disabled){background:var(--brand-2)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+.stop-btn{color:#fff;background:#ef4444;display:none}
+.stop-btn svg{width:16px;height:16px}
+.pause-btn{color:#fff;background:#f59e0b;display:none}
+.pause-btn svg{width:14px;height:14px}
+.composer__inner.busy .send-btn,.composer__inner.busy .mic-btn,
+.composer__inner.busy .attach-btn,.composer__inner.busy .emoji-btn{display:none}
+.composer__inner.busy .stop-btn,.composer__inner.busy .pause-btn{display:grid}
+.composer__inner.paused .pause-btn{background:#10b981}
+.waveform{display:none;align-items:center;gap:2px;height:20px;padding:0 4px;flex:none}
+.waveform.active{display:flex}
+.waveform span{width:2px;background:#ef4444;border-radius:1px;animation:waveBar .8s ease-in-out infinite}
+.waveform span:nth-child(1){animation-delay:0s}
+.waveform span:nth-child(2){animation-delay:.1s}
+.waveform span:nth-child(3){animation-delay:.2s}
+.waveform span:nth-child(4){animation-delay:.15s}
+.waveform span:nth-child(5){animation-delay:.05s}
+@keyframes waveBar{0%,100%{height:4px}50%{height:18px}}
+.emoji-picker{
+  position:absolute;bottom:calc(100% + 8px);left:12px;
+  width:min(360px,calc(100vw - 32px));max-height:320px;overflow-y:auto;padding:10px;
+  background:var(--surface);border:1px solid var(--stroke);border-radius:14px;
+  box-shadow:var(--shadow-panel);opacity:0;pointer-events:none;transform:translateY(8px);
+  transition:opacity .2s,transform .2s;z-index:60;
+}
+.emoji-picker.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.emoji-cat{display:flex;gap:4px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--stroke-soft);overflow-x:auto}
+.emoji-cat-btn{padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;flex:none;min-height:34px}
+.emoji-cat-btn:hover,.emoji-cat-btn.active{background:rgba(var(--brand-rgb),.1);color:var(--brand-1)}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px}
+.emoji-grid button{aspect-ratio:1;border-radius:6px;font-size:20px;display:grid;place-items:center}
+.emoji-grid button:hover{background:rgba(var(--brand-rgb),.12)}
+.hint{margin:9px 4px 0;font-size:11.5px;color:var(--muted);text-align:center;opacity:.75}
+kbd{padding:1.5px 6px;font-size:10.5px;color:var(--muted);border-radius:5px;border:1px solid var(--stroke);background:transparent}
+
+/* ── sidebar scrim – no blur, just dim ──────── */
+.sidebar-overlay{
+  position:fixed;inset:0;z-index:98;
+  background:rgba(15,23,42,.45);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .25s,visibility .25s;
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+.sidebar-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+  /* Blur removed to keep chat sharp on mobile */
+}
+
+/* ── modal overlay – no blur on mobile ───────────────── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(15,23,42,.55);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  display:grid;place-items:center;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .3s,visibility .3s;padding:16px;overflow-y:auto;
+}
+.modal-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+}
+.modal{
+  background:var(--surface);border:1px solid var(--stroke);border-radius:var(--radius-xl);
+  padding:28px 24px;width:100%;max-width:420px;max-height:calc(var(--app-h) - 32px);
+  overflow-y:auto;box-shadow:0 30px 70px -20px rgba(15,23,42,.35);
+  display:flex;flex-direction:column;gap:14px;
+  transform:translateY(24px) scale(.96);opacity:0;
+  transition:transform .4s var(--ease),opacity .4s var(--ease);
+  margin:auto;
+}
+.modal-overlay.show .modal{transform:translateY(0) scale(1);opacity:1}
+.modal h2{margin:0;font-size:22px;text-align:center}
+.modal p{margin:0;font-size:14px;color:var(--muted);text-align:center;line-height:1.5}
+.modal input,.modal textarea{
+  width:100%;padding:14px 16px;border-radius:12px;
+  border:1px solid var(--stroke);background:var(--bg);
+  font-size:16px;outline:none;font-family:inherit;
+}
+.modal input:focus,.modal textarea:focus{border-color:var(--brand-1);box-shadow:0 0 0 3px rgba(var(--brand-rgb),.12)}
+
+.password-wrap{position:relative;display:flex;align-items:center}
+.password-wrap input{padding-right:48px;width:100%}
+.password-toggle{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:40px;height:40px;
+  display:grid;place-items:center;
+  border-radius:10px;
+  color:var(--muted);background:transparent;border:0;cursor:pointer;
+  transition:color .15s,background .15s,transform .15s;
+}
+.password-toggle:hover{color:var(--brand-1);background:rgba(var(--brand-rgb),.10)}
+.password-toggle:focus-visible{outline:2px solid var(--brand-1);outline-offset:2px}
+.password-toggle svg{width:20px;height:20px;pointer-events:none}
+.password-toggle[data-visible="true"]{color:var(--brand-1)}
+.password-toggle:active{transform:translateY(-50%) scale(0.92)}
+
+.modal-btn{
+  width:100%;padding:14px;border-radius:12px;
+  background:var(--brand-1);color:#fff;font-weight:600;font-size:15px;min-height:48px;
+}
+.modal-btn:hover:not(:disabled){background:var(--brand-2)}
+.modal-btn:disabled{opacity:.55;cursor:not-allowed}
+.modal-btn.secondary{background:transparent;color:var(--muted);border:1px solid var(--stroke)}
+.modal-btn.secondary:hover:not(:disabled){background:var(--bg);color:var(--text)}
+.modal-btn.ghost{
+  background:transparent;color:var(--brand-1);
+  border:1px dashed rgba(var(--brand-rgb),.35);
+  font-weight:500;font-size:13.5px;
+}
+.modal-btn.ghost:hover{background:rgba(var(--brand-rgb),.06);border-style:solid}
+.modal-error{color:#ef4444;font-size:12.5px;text-align:center;min-height:18px}
+.modal-success{color:#10b981;font-size:12.5px;text-align:center;min-height:18px}
+.modal-switch{font-size:13px;text-align:center;color:var(--muted)}
+.modal-switch a{color:var(--brand-1);cursor:pointer;font-weight:600}
+.modal-link-row{display:flex;justify-content:center;gap:6px;font-size:12.5px}
+.modal-link-row a{color:var(--brand-1);cursor:pointer;font-weight:600}
+.auth-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px}
+.auth-brand svg{width:42px;height:42px;border-radius:12px;box-shadow:0 8px 24px -8px rgba(var(--brand-rgb),.6)}
+.auth-brand span{
+  font-size:22px;font-weight:800;
+  background:linear-gradient(90deg,var(--brand-1),var(--brand-2),#06b6d4,var(--brand-1));
+  background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:gradient-text 5s linear infinite;
+}
+.auth-divider{
+  display:flex;align-items:center;gap:12px;color:var(--muted);
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
+}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--stroke)}
+
+/* ── command palette – no blur on mobile ─────────────── */
+.cmd-palette-overlay{
+  position:fixed;inset:0;z-index:1100;
+  background:rgba(15,23,42,.55);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  display:grid;place-items:start center;padding:15vh 16px 16px;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .2s,visibility .2s;
+}
+.cmd-palette-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+}
+.cmd-palette{
+  width:100%;max-width:560px;background:var(--surface);
+  border:1px solid var(--stroke);border-radius:16px;
+  box-shadow:0 40px 80px -20px rgba(15,23,42,.5);
+  overflow:hidden;transform:translateY(-12px) scale(.98);
+  transition:transform .25s var(--ease);
+}
+.cmd-palette-overlay.show .cmd-palette{transform:translateY(0) scale(1)}
+.cmd-palette__input-wrap{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--stroke-soft)}
+.cmd-palette__input{flex:1;border:0;outline:0;background:transparent;font-size:15px}
+.cmd-palette__list{max-height:360px;overflow-y:auto;padding:6px}
+.cmd-palette__item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;font-size:13.5px;cursor:pointer}
+.cmd-palette__item:hover,.cmd-palette__item.selected{background:rgba(var(--brand-rgb),.1);color:var(--brand-1)}
+.cmd-palette__empty{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+.cmd-palette__group{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 14px 4px}
+
+.toast-container{
+  position:fixed;bottom:24px;right:24px;z-index:1200;
+  display:flex;flex-direction:column;gap:10px;pointer-events:none;
+  max-width:calc(100vw - 48px);
+}
+.toast{
+  min-width:260px;max-width:380px;display:flex;align-items:flex-start;gap:12px;
+  padding:14px 16px;border-radius:12px;background:var(--surface);
+  border:1px solid var(--stroke);box-shadow:0 20px 40px -12px rgba(15,23,42,.35);
+  color:var(--text);font-size:13.5px;pointer-events:auto;
+  animation:toastIn .35s var(--ease) both;position:relative;overflow:hidden;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+.toast.leaving{animation:toastOut .3s forwards}
+@keyframes toastOut{to{opacity:0;transform:translateX(24px)}}
+.toast__icon{width:20px;height:20px;flex:none}
+.toast__body{flex:1;min-width:0}
+.toast__title{font-weight:600;margin-bottom:2px}
+.toast__msg{color:var(--muted);font-size:12.5px}
+.toast__close{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--muted)}
+.toast__close svg{width:12px;height:12px}
+.toast--success .toast__icon{color:#10b981}
+.toast--error .toast__icon{color:#ef4444}
+.toast--info .toast__icon{color:var(--brand-1)}
+.toast--warning .toast__icon{color:#f59e0b}
+
+.net-status{
+  position:fixed;top:12px;right:12px;z-index:1500;
+  padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;
+  background:#f59e0b;color:#fff;opacity:0;transform:translateY(-12px);
+  transition:opacity .3s,transform .3s;display:flex;align-items:center;gap:6px;pointer-events:none;
+}
+.net-status.show{opacity:1;transform:translateY(0)}
+.net-status.online{background:#10b981}
+.net-status.offline{background:#ef4444}
+.net-status__dot{width:6px;height:6px;border-radius:50%;background:#fff;animation:netPulse 1.5s infinite}
+@keyframes netPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+body.zen-mode .sidebar,body.zen-mode .chat__header{display:none}
+body.zen-mode .stage{padding:0}
+body.zen-mode .app{grid-template-columns:minmax(0,1fr);gap:0}
+body.zen-mode .chat{grid-column:1}
+
+.context-menu{
+  position:fixed;z-index:2000;min-width:180px;
+  background:var(--surface);border:1px solid var(--stroke);border-radius:10px;
+  box-shadow:var(--shadow-panel);padding:6px;
+  animation:ctxIn .15s var(--ease);
+}
+@keyframes ctxIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.context-menu-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:8px 10px;border-radius:6px;font-size:12.5px;text-align:left;color:var(--text);
+}
+.context-menu-item:hover{background:rgba(var(--brand-rgb),.08);color:var(--brand-1)}
+.context-menu-item svg{width:13px;height:13px}
+.context-menu-sep{height:1px;background:var(--stroke-soft);margin:4px}
+.color-dot{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s}
+.color-dot:hover{transform:scale(1.2)}
+.color-dot.active{border-color:var(--text)}
+
+.plugin-item{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+  border:1px solid var(--stroke);background:var(--bg);margin-bottom:6px;font-size:12.5px;
+}
+.plugin-item__name{font-weight:600;flex:1}
+.plugin-item__desc{font-size:11px;color:var(--muted)}
+.plugin-item .sw{width:32px;height:18px;border-radius:999px;background:var(--stroke);position:relative;transition:background .2s;flex:none}
+.plugin-item .sw::after{
+  content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:transform .2s;
+}
+.plugin-item .sw.on{background:var(--brand-1)}
+.plugin-item .sw.on::after{transform:translateX(14px)}
+.memory-item{
+  padding:10px;border:1px solid var(--stroke);border-radius:8px;
+  background:var(--bg);margin-bottom:6px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;
+}
+.memory-item__text{flex:1;min-width:0}
+.memory-item__del{color:#ef4444;width:22px;height:22px;display:grid;place-items:center;border-radius:6px}
+.memory-item__del:hover{background:rgba(239,68,68,.1)}
+.memory-item__del svg{width:11px;height:11px}
+
+.confetti{
+  position:fixed;top:0;left:0;width:8px;height:8px;z-index:2500;
+  pointer-events:none;animation:confettiFall 2.5s linear forwards;
+}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+.slash-menu{
+  position:absolute;bottom:calc(100% + 4px);left:12px;right:12px;
+  max-height:200px;overflow-y:auto;background:var(--surface);
+  border:1px solid var(--stroke);border-radius:10px;
+  box-shadow:var(--shadow-panel);padding:4px;z-index:60;display:none;
+}
+.slash-menu.show{display:block}
+.slash-item{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-radius:6px;font-size:12.5px;cursor:pointer;
+}
+.slash-item:hover,.slash-item.active{background:rgba(var(--brand-rgb),.1);color:var(--brand-1)}
+.slash-item code{
+  font-family:var(--mono);font-size:11.5px;
+  background:rgba(var(--brand-rgb),.08);padding:1px 5px;border-radius:4px;color:var(--brand-1);
+}
+.slash-item__desc{margin-left:auto;color:var(--muted);font-size:11px}
+
+.import-drop{
+  position:fixed;inset:0;z-index:1800;
+  background:rgba(var(--brand-rgb),.15);backdrop-filter:blur(6px);
+  display:none;place-items:center;border:3px dashed var(--brand-1);
+  font-size:20px;font-weight:700;color:var(--brand-1);
+}
+.import-drop.show{display:grid}
+
+#msgSearchBar{
+  display:none;padding:10px 14px;background:var(--surface);
+  border-bottom:1px solid var(--stroke);align-items:center;gap:8px;
+}
+#msgSearchBar.show{display:flex}
+#msgSearchInput{
+  flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--stroke);
+  background:var(--bg);font-size:13.5px;outline:0;
+}
+#msgSearchCount{font-size:12px;color:var(--muted);padding:0 6px}
+#msgSearchPrev,#msgSearchNext,#msgSearchClose{
+  width:32px;height:32px;border-radius:8px;color:var(--muted);
+  display:grid;place-items:center;
+}
+
+@media (max-width:900px){
+  .stage{padding:0;align-items:stretch;justify-content:stretch;background:var(--bg)}
+  .app{
+    grid-template-columns:1fr;
+    width:100%;height:var(--app-h);
+    gap:0;border-radius:0;
+  }
+  .app.is-collapsed{grid-template-columns:1fr}
+
+  .sidebar{
+    grid-column:auto;
+    position:fixed;top:0;left:0;bottom:0;right:auto;
+    width:min(86vw,340px);max-width:340px;
+    z-index:99;
+    border-radius:0 20px 20px 0;
+    border-right:1px solid var(--stroke);
+    border-top:0;border-bottom:0;border-left:0;
+    transform:translateX(0);
+    transition:transform .32s var(--ease),opacity .25s var(--ease);
+    padding-top:env(safe-area-inset-top,0px);
+    box-shadow:8px 0 32px -12px rgba(15,23,42,.25);
+    will-change:transform;
+  }
+  .sidebar.collapsed{
+    transform:translateX(-105%);
+    opacity:0;pointer-events:none;
+  }
+  .app.is-collapsed .sidebar{opacity:0;pointer-events:none;border-color:var(--stroke)}
+
+  /* solid header, no backdrop-filter */
+  .sidebar__head{
+    padding:16px 18px 12px;
+    position:sticky;top:0;z-index:2;
+    background:var(--surface-2);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+  }
+  .sidebar__brand span{font-size:15px}
+
+  .chat{
+    grid-column:auto;
+    border-radius:0;border:0;
+    box-shadow:none;
+    height:100%;
+    display:flex;flex-direction:column;
+  }
+
+  /* solid header, no backdrop-filter */
+  .chat__header{
+    padding:calc(12px + env(safe-area-inset-top,0px)) 14px 12px;
+    background:var(--surface-2);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    position:sticky;top:0;z-index:20;
+    min-height:56px;
+  }
+  .chat__header .icon-btn{width:38px;height:38px}
+  .avatar{width:38px;height:38px;border-radius:11px}
+  .avatar svg{width:20px;height:20px}
+  .identity__name{font-size:14.5px}
+  .identity__status{font-size:11px}
+  .badge{display:none}
+  .identity__status{display:none}
+
+  /* no -webkit-overflow-scrolling */
+  .chat__body{
+    padding:16px 12px 8px;
+    gap:12px;
+  }
+  .msg{max-width:92%}
+  .bubble{
+    font-size:15px;
+    padding:11px 14px;
+    max-height:none;
+    max-width:calc(100vw - 70px);
+    word-break:break-word;
+  }
+  .msg__avatar{width:26px;height:26px;border-radius:8px}
+  .msg__avatar svg{width:15px;height:15px}
+  .msg-actions{opacity:1;height:auto;margin-top:8px}
+  .msg-action{width:32px;height:32px}
+  .msg-action svg{width:15px;height:15px}
+
+  /* solid composer, no backdrop-filter */
+  .composer{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+    background:var(--surface-2);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    border-top:1px solid var(--stroke-soft);
+    position:sticky;bottom:0;z-index:15;
+  }
+  .composer__inner{padding:5px;gap:4px;border-radius:24px}
+  .composer textarea{font-size:16px;padding:9px 4px;max-height:120px}
+  .attach-btn,.mic-btn,.emoji-btn{width:38px;height:38px;border:0;background:transparent}
+  .send-btn,.stop-btn,.pause-btn{width:38px;height:38px}
+  .hint{display:none}
+
+  .emoji-picker{bottom:calc(100% + 6px);left:8px;right:8px;width:auto;max-height:50vh}
+  .emoji-grid{grid-template-columns:repeat(7,1fr)}
+
+  .scroll-top-btn{bottom:calc(80px + env(safe-area-inset-bottom,0px));right:14px}
+
+  .toast-container{bottom:calc(16px + env(safe-area-inset-bottom,0px));right:14px;left:14px}
+  .toast{min-width:unset;max-width:unset;width:100%}
+
+  .modal{padding:24px 20px;max-height:calc(var(--app-h) - 24px)}
+  .cmd-palette-overlay{padding:8vh 12px 12px}
+  .context-menu{padding:8px}
+  .context-menu-item{padding:12px;font-size:14px}
+  .settings-dropdown{min-width:min(300px,calc(100vw - 24px))}
+  .settings-item{padding:12px 14px}
+
+  /* ── SAFETY NET: kill every backdrop-filter on mobile ───────── */
+  .chat__header,
+  .composer,
+  .sidebar__head,
+  .sidebar-overlay.show,
+  .modal-overlay.show,
+  .cmd-palette-overlay.show,
+  .import-drop{
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+  }
+}
+
+@media (max-width:400px){
+  .chat__header .icon-btn{width:36px;height:36px}
+  .chat__header .icon-btn svg{width:15px;height:15px}
+  .identity{gap:8px}
+  .avatar{width:34px;height:34px}
+  .identity__name{font-size:14px}
+  .bubble{font-size:14.5px;padding:10px 13px}
+  .emoji-grid{grid-template-columns:repeat(6,1fr)}
+}
+
+@media (max-width:900px) and (orientation:landscape){
+  .chat__header{padding-top:8px;padding-bottom:8px}
+  .chat__body{padding-top:10px}
+  .composer{padding-top:8px;padding-bottom:8px}
+}
+
+@supports (padding:env(safe-area-inset-top)){
+  .sidebar{padding-top:env(safe-area-inset-top,0px)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="aurora-bg" id="auroraBg"><div class="aurora-blob"></div><div class="aurora-blob"></div><div class="aurora-blob"></div></div>
+
+<div class="net-status" id="netStatus"><span class="net-status__dot"></span><span id="netStatusText">Online</span></div>
+<div class="toast-container" id="toastContainer"></div>
+<div class="import-drop" id="importDrop">Drop JSON to import</div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <div class="auth-brand">
+      <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="var(--brand-1)"/><path d="M32 32h36v9H57v32h-14V41H32z" fill="#fff"/></svg>
+      <span>Thinkly</span>
+    </div>
+    <h2 id="authTitle">Welcome Back</h2>
+    <p id="authSubtitle">Sign in to access your chats</p>
+    <input type="text" id="authUsername" placeholder="Username or email" autocomplete="username" />
+    <div class="password-wrap">
+      <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" />
+      <button type="button" class="password-toggle" id="authPasswordToggle" aria-label="Show password" aria-pressed="false" title="Show password">
+        <svg id="authEyeOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <svg id="authEyeOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="authError"></div>
+    <button class="modal-btn" id="authSubmitBtn">Sign In</button>
+    <div class="modal-link-row">
+      <a id="authForgotLink">Forgot password?</a>
+    </div>
+    <div class="auth-divider">or</div>
+    <button class="modal-btn ghost" id="guestBtn">Continue as Guest</button>
+    <div class="modal-switch">
+      <span id="authSwitchText">Don't have an account?</span>
+      <a id="authSwitchLink">Sign Up</a>
+    </div>
+  </div>
+</div>
+
+<!-- FORGOT MODAL -->
+<div class="modal-overlay" id="forgotModal">
+  <div class="modal">
+    <div class="auth-brand">
+      <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="var(--brand-1)"/><path d="M32 32h36v9H57v32h-14V41H32z" fill="#fff"/></svg>
+      <span>Thinkly</span>
+    </div>
+    <h2>Reset Password</h2>
+    <p>Enter your username or email and we'll send you a reset link.</p>
+    <input type="text" id="forgotUsername" placeholder="Username or email" autocomplete="username" />
+    <div class="modal-error" id="forgotError"></div>
+    <div class="modal-success" id="forgotSuccess"></div>
+    <button class="modal-btn" id="forgotSubmitBtn">Send reset link</button>
+    <button class="modal-btn secondary" id="forgotBackBtn">Back to sign in</button>
+  </div>
+</div>
+
+<!-- RESET MODAL -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <div class="auth-brand">
+      <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="var(--brand-1)"/><path d="M32 32h36v9H57v32h-14V41H32z" fill="#fff"/></svg>
+      <span>Thinkly</span>
+    </div>
+    <h2>Set New Password</h2>
+    <p>Choose a strong password of at least 8 characters.</p>
+
+    <div class="password-wrap">
+      <input type="password" id="resetPassword" placeholder="New password (min 8 chars)" autocomplete="new-password" />
+      <button type="button" class="password-toggle" id="resetPasswordToggle" aria-label="Show password" aria-pressed="false" title="Show password">
+        <svg id="resetEyeOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <svg id="resetEyeOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="password-wrap">
+      <input type="password" id="resetPassword2" placeholder="Confirm new password" autocomplete="new-password" />
+      <button type="button" class="password-toggle" id="resetPassword2Toggle" aria-label="Show password" aria-pressed="false" title="Show password">
+        <svg id="reset2EyeOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <svg id="reset2EyeOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-error" id="resetError"></div>
+    <div class="modal-success" id="resetSuccess"></div>
+    <button class="modal-btn" id="resetSubmitBtn">Update password</button>
+    <button class="modal-btn secondary" id="resetBackBtn">Back to sign in</button>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="modal-overlay" id="statsModal">
+  <div class="modal" style="max-width:480px;">
+    <h2>Usage Stats</h2>
+    <div id="statsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;">Last 7 days</div>
+    <div id="statsChart" style="height:120px;display:flex;align-items:flex-end;gap:4px;padding:10px 0;"></div>
+    <button class="modal-btn secondary" id="statsClose">Close</button>
+  </div>
+</div>
+
+<!-- GLOBAL SEARCH -->
+<div class="modal-overlay" id="globalSearchModal">
+  <div class="modal" style="max-width:600px;">
+    <div style="display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--stroke-soft);padding-bottom:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--muted);"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="globalSearchInput" placeholder="Search all conversations..." style="flex:1;border:0;outline:0;background:transparent;font-size:15px;" />
+    </div>
+    <div id="globalSearchList" style="max-height:420px;overflow-y:auto;padding:4px 0;"></div>
+    <button class="modal-btn secondary" id="globalSearchClose">Close</button>
+  </div>
+</div>
+
+<!-- CSS EDITOR -->
+<div class="modal-overlay" id="cssEditorModal">
+  <div class="modal" style="max-width:600px;">
+    <h2>Custom CSS</h2>
+    <textarea id="cssEditorInput" style="min-height:200px;font-family:var(--mono);font-size:12px;"></textarea>
+    <div style="display:flex;gap:8px;">
+      <button class="modal-btn" id="cssSave">Save</button>
+      <button class="modal-btn secondary" id="cssReset">Reset</button>
+    </div>
+    <button class="modal-btn secondary" id="cssClose">Close</button>
+  </div>
+</div>
+
+<!-- PLUGINS -->
+<div class="modal-overlay" id="pluginsModal">
+  <div class="modal">
+    <h2>Plugins</h2>
+    <div id="pluginsList" style="padding:4px 0;"></div>
+    <button class="modal-btn secondary" id="pluginsClose">Close</button>
+  </div>
+</div>
+
+<!-- MEMORY -->
+<div class="modal-overlay" id="memoryModal">
+  <div class="modal">
+    <h2>Memory</h2>
+    <p>Facts the bot remembers about you.</p>
+    <input type="text" id="memoryInput" placeholder="Add a fact..." />
+    <button class="modal-btn" id="memoryAdd">Add</button>
+    <div id="memoryList" style="margin-top:8px;"></div>
+    <button class="modal-btn secondary" id="memoryClose">Close</button>
+  </div>
+</div>
+
+<!-- KNOWLEDGE BASE -->
+<div class="modal-overlay" id="kbModal">
+  <div class="modal">
+    <h2>Knowledge Base</h2>
+    <p>Add docs the bot can reference.</p>
+    <input type="text" id="kbName" placeholder="Doc name" />
+    <textarea id="kbContent" placeholder="Paste content..." style="min-height:120px;font-family:inherit;"></textarea>
+    <button class="modal-btn" id="kbAdd">Add doc</button>
+    <div id="kbList" style="margin-top:8px;"></div>
+    <button class="modal-btn secondary" id="kbClose">Close</button>
+  </div>
+</div>
+
+<!-- SHORTCUTS -->
+<div class="modal-overlay" id="shortcutsModal">
+  <div class="modal" style="max-width:460px;">
+    <h2>Shortcuts</h2>
+    <div style="display:grid;gap:8px;padding:6px 0;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Command palette</span><div><kbd>Ctrl K</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Find in chat</span><div><kbd>Ctrl F</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Global search</span><div><kbd>Ctrl Shift F</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Stats</span><div><kbd>Ctrl Shift S</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Zen mode</span><div><kbd>Ctrl .</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">New chat</span><div><kbd>Ctrl Shift O</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--stroke-soft);"><span style="color:var(--muted);">Slash commands</span><div><kbd>/</kbd></div></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">This panel</span><div><kbd>?</kbd></div></div>
+    </div>
+    <button class="modal-btn secondary" id="shortcutsClose">Close</button>
+  </div>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="cmd-palette-overlay" id="cmdPaletteOverlay">
+  <div class="cmd-palette">
+    <div class="cmd-palette__input-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--muted);"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" class="cmd-palette__input" id="cmdPaletteInput" placeholder="Type a command or search..." />
+    </div>
+    <div class="cmd-palette__list" id="cmdPaletteList"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="stage">
+  <div class="app" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__head">
+        <div class="sidebar__brand">
+          <svg viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="var(--brand-1)"/><path d="M32 32h36v9H57v32h-14V41H32z" fill="#fff"/></svg>
+          <span>Conversations</span>
+        </div>
+        <button class="icon-btn" id="sidebarCloseBtn" style="width:36px;height:36px;" aria-label="Close sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="sidebar__search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search..." />
+        <button class="search-clear" id="searchClear" aria-label="Clear search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="sidebar__toolbar">
+        <button class="toolbar-btn" id="sortBtn" title="Sort"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg> <span id="sortLabel">Date</span></button>
+        <button class="toolbar-btn" id="starFilterBtn" title="Show favorites"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <span id="starFilterLabel">All</span></button>
+        <div class="toolbar-spacer"></div>
+      </div>
+      <button class="new-chat-btn" id="newChatBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>New conversation</span>
+      </button>
+      <div class="conv-list" id="convList"></div>
+      <div class="user-profile" id="userProfile" style="display:none;">
+        <div class="user-info">
+          <div class="user-name" id="userNameDisplay">User</div>
+          <div class="user-status" id="userStatusDisplay">Online</div>
+        </div>
+        <button class="logout-btn" id="logoutBtn" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <main class="chat" id="chatShell">
+      <header class="chat__header">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <button class="icon-btn" id="sidebarToggleBtn" aria-label="Toggle sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+          </button>
+          <div class="identity">
+            <div class="avatar" id="avatar">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12v2.6h-4.2v8.4h-3.6v-8.4H6z" fill="#fff"/></svg>
+            </div>
+            <div>
+              <h1 class="identity__name"><span>Thinkly</span><span class="badge" id="modeBadge">Pro</span></h1>
+              <p class="identity__status"><span class="pulse-dot"></span><span id="headerStatus">Online</span></p>
+            </div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="findBtn" title="Find (Ctrl+F)" aria-label="Find">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </button>
+          <div class="settings-wrap">
+            <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            <div class="settings-dropdown" id="settingsDropdown"></div>
+          </div>
+        </div>
+      </header>
+
+      <div id="msgSearchBar">
+        <input type="text" id="msgSearchInput" placeholder="Find..." />
+        <span id="msgSearchCount">0 / 0</span>
+        <button id="msgSearchPrev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button id="msgSearchNext" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M9 18l6-6-6-6"/></svg></button>
+        <button id="msgSearchClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <div class="chat__body" id="messages" role="log"></div>
+      <button class="scroll-top-btn" id="scrollTopBtn" title="Scroll to top" aria-label="Scroll to top">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+
+      <div class="composer">
+        <div class="token-counter" id="tokenCounter">0 tokens</div>
+        <div class="attach-preview" id="attachPreview"></div>
+        <div class="slash-menu" id="slashMenu"></div>
+        <div class="emoji-picker" id="emojiPicker">
+          <div class="emoji-cat" id="emojiCat"></div>
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+        <div class="composer__inner" id="composerInner">
+          <button class="emoji-btn" id="emojiBtn" title="Emoji" aria-label="Emoji">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+          </button>
+          <button class="attach-btn" id="attachBtn" title="Attach" aria-label="Attach">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="file" id="fileInput" accept="image/*" multiple hidden />
+          <textarea id="input" rows="1" placeholder="Message Thinkly..." autocomplete="off"></textarea>
+          <div class="waveform" id="waveform"><span></span><span></span><span></span><span></span><span></span></div>
+          <button class="mic-btn" id="micBtn" title="Voice" aria-label="Voice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg>
+          </button>
+          <button class="pause-btn" id="pauseBtn" title="Pause" aria-label="Pause">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          </button>
+          <button class="stop-btn" id="stopBtn" title="Stop" aria-label="Stop">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button class="send-btn" id="sendBtn" disabled aria-label="Send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg>
+          </button>
+        </div>
+        <p class="hint">Press <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>/</kbd> for commands</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const API_ENDPOINT = '/api/chat';
+const GUEST_KEY = '__guest__';
+
+let currentUser = null;
+let isGuest = false;
+let conversations = [], activeId = null, isBusy = false;
+let pendingAttachments = [], abortController = null;
+let showTimestamps = false, showStats = false;
+let streamSpeed = 'normal';
+let themeIndex = 0, currentAccent = {hex:'#6366f1',rgb:'99,102,241'};
+let sortMode = 'date';
+let favOnly = false;
+let showTokenCounter = false;
+let autoTheme = false;
+let starFilter = 'all';
+let isPaused = false;
+
+function setupPasswordToggle(toggleId, inputId, eyeOnId, eyeOffId) {
+  const toggle = $(toggleId);
+  const input = $(inputId);
+  const eyeOn = $(eyeOnId);
+  const eyeOff = $(eyeOffId);
+  if (!toggle || !input) return;
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    const nextVisible = input.type !== 'text';
+    input.type = nextVisible ? 'text' : 'password';
+    toggle.dataset.visible = String(nextVisible);
+    toggle.setAttribute('aria-pressed', String(nextVisible));
+    toggle.setAttribute('aria-label', nextVisible ? 'Hide password' : 'Show password');
+    toggle.setAttribute('title', nextVisible ? 'Hide password' : 'Show password');
+    if (eyeOn) eyeOn.style.display = nextVisible ? 'none' : '';
+    if (eyeOff) eyeOff.style.display = nextVisible ? '' : 'none';
+  });
+}
+setupPasswordToggle('authPasswordToggle', 'authPassword', 'authEyeOn', 'authEyeOff');
+setupPasswordToggle('resetPasswordToggle', 'resetPassword', 'resetEyeOn', 'resetEyeOff');
+setupPasswordToggle('resetPassword2Toggle', 'resetPassword2', 'reset2EyeOn', 'reset2EyeOff');
+
+function resetAuthPasswordVisibility() {
+  const inp = $('authPassword');
+  if (inp) inp.type = 'password';
+  const toggle = $('authPasswordToggle');
+  if (toggle) {
+    toggle.dataset.visible = 'false';
+    toggle.setAttribute('aria-pressed', 'false');
+    const on = $('authEyeOn'), off = $('authEyeOff');
+    if (on) on.style.display = '';
+    if (off) off.style.display = 'none';
+  }
+}
+
+const ICONS = {
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+  pinFilled: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  starFilled: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M19 6l-.9 13.1A2 2 0 0 1 16.1 21H7.9a2 2 0 0 1-2-1.9L5 6"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>',
+  thumbUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  thumbDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>',
+  speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  backup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.54z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-1.54z"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  hash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+  puzzle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  keyboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>',
+  maximize: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.8-10-8.8z"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>',
+  chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>'
+};
+
+function setAppHeight() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 100));
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', setAppHeight);
+  window.visualViewport.addEventListener('scroll', setAppHeight);
+}
+
+const TOAST_ICONS = {
+  success: '<svg class="toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>',
+  error: '<svg class="toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+  info: '<svg class="toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  warning: '<svg class="toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>'
+};
+function showToast(title, msg = '', type = 'info', duration = 3500) {
+  const toast = document.createElement('div');
+  toast.className = 'toast toast--' + type;
+  toast.innerHTML = `${TOAST_ICONS[type]}<div class="toast__body"><div class="toast__title"></div>${msg ? '<div class="toast__msg"></div>' : ''}</div><button class="toast__close">${ICONS.x}</button>`;
+  toast.querySelector('.toast__title').textContent = title;
+  if (msg) toast.querySelector('.toast__msg').textContent = msg;
+  const dismiss = () => { toast.classList.add('leaving'); setTimeout(() => toast.remove(), 300); };
+  toast.querySelector('.toast__close').addEventListener('click', dismiss);
+  $('toastContainer').appendChild(toast);
+  if (duration > 0) setTimeout(dismiss, duration);
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const SYNTAX_KEYWORDS = new Set([
+  'function','return','if','else','for','while','var','let','const','class','new',
+  'this','try','catch','finally','throw','async','await','import','export','from',
+  'default','def','elif','null','undefined','true','false','None','True','False',
+  'self','lambda','yield','with','as','in','is','not','and','or','public','private',
+  'static','void','int','str','float','bool','string','number','boolean','type',
+  'interface','extends','implements','super','case','switch','break','continue',
+  'do','typeof','instanceof','delete'
+]);
+
+function highlightCode(code) {
+  let html = escapeHTML(code);
+  html = html.replace(/(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="tok-com">$1</span>');
+  html = html.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;|`[^`]*?`)/g, '<span class="tok-str">$1</span>');
+  html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="tok-num">$1</span>');
+  html = html.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g, m => SYNTAX_KEYWORDS.has(m) ? `<span class="tok-kw">${m}</span>` : m);
+  html = html.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\()/g, '<span class="tok-fn">$1</span>');
+  html = html.replace(/<span class="tok-([a-z]+)"><span[^>]*>/g, '<span class="tok-$1">');
+  return html;
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  const blocks = [];
+  let working = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = blocks.length;
+    blocks.push({ lang: lang || 'code', code: code.replace(/\n$/, '') });
+    return `\u0000CB${idx}\u0000`;
+  });
+  working = escapeHTML(working);
+  working = working.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  working = working.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  working = working.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  working = working.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  working = working.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  working = working.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  working = working.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  working = working.replace(/^---+$/gm, '<hr>');
+  working = working.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  working = working.replace(/(?:^|\n)((?:[•\-\*] .+(?:\n|$))+)/g, m => {
+    const items = m.trim().split(/\n/).map(l => '<li>' + l.replace(/^[•\-\*]\s+/, '') + '</li>').join('');
+    return '\n<ul>'+items+'</ul>\n';
+  });
+  working = working.replace(/(?:^|\n)((?:\d+\. .+(?:\n|$))+)/g, m => {
+    const items = m.trim().split(/\n/).map(l => '<li>' + l.replace(/^\d+\.\s+/, '') + '</li>').join('');
+    return '\n<ol>'+items+'</ol>\n';
+  });
+  working = working.split(/\n{2,}/).map(chunk => {
+    const t = chunk.trim();
+    if (!t) return '';
+    if (/^<(h[1-3]|ul|ol|hr|blockquote|div|pre|table)/i.test(t)) return t;
+    if (/^\u0000CB\d+\u0000$/.test(t)) return t;
+    return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
+  }).join('\n');
+  working = working.replace(/\u0000CB(\d+)\u0000/g, (_, i) => {
+    const b = blocks[+i];
+    return `<div class="code-block"><div class="code-block__head"><span>${escapeHTML(b.lang === 'code' ? 'text' : b.lang)}</span><button class="code-block__copy" type="button">Copy</button></div><pre><code>${highlightCode(b.code)}</code></pre></div>`;
+  });
+  return working;
+}
+
+const THEMES = ['light','dark','system'];
+const mqlDark = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(theme) {
+  let eff = theme;
+  if (theme === 'system') eff = mqlDark.matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', eff);
+}
+function applyAccent(a) {
+  currentAccent = a;
+  document.documentElement.style.setProperty('--brand-1', a.hex);
+  document.documentElement.style.setProperty('--brand-2', a.hex);
+  document.documentElement.style.setProperty('--brand-rgb', a.rgb);
+  try { localStorage.setItem('thinkly-accent', JSON.stringify(a)); } catch(e){}
+  document.querySelectorAll('.accent-swatch').forEach(s => s.classList.toggle('active', s.dataset.hex === a.hex));
+}
+try {
+  const t = localStorage.getItem('thinkly-theme');
+  if (t && THEMES.includes(t)) themeIndex = THEMES.indexOf(t);
+  const acc = JSON.parse(localStorage.getItem('thinkly-accent') || 'null');
+  if (acc && acc.hex) currentAccent = acc;
+} catch(e){}
+applyTheme(THEMES[themeIndex]);
+applyAccent(currentAccent);
+
+function getStorageKeys() {
+  if (!currentUser) return { key: null, activeKey: null };
+  return { key: `thinkly-conv_${currentUser}`, activeKey: `thinkly-active_${currentUser}` };
+}
+function loadFromStorage() {
+  const { key, activeKey } = getStorageKeys();
+  if (!key) { conversations = []; activeId = null; return; }
+  try {
+    const raw = localStorage.getItem(key);
+    conversations = raw ? JSON.parse(raw) : [];
+    activeId = localStorage.getItem(activeKey);
+  } catch(e) { conversations = []; activeId = null; }
+  if (!Array.isArray(conversations)) conversations = [];
+  try {
+    showTimestamps = localStorage.getItem('thinkly-timestamps') === '1';
+    showStats = localStorage.getItem('thinkly-stats') === '1';
+    showTokenCounter = localStorage.getItem('thinkly-tokencount') === '1';
+    autoTheme = localStorage.getItem('thinkly-autotheme') === '1';
+  } catch(e){}
+}
+function saveToStorage() {
+  const { key, activeKey } = getStorageKeys();
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(conversations));
+    if (activeId) localStorage.setItem(activeKey, activeId);
+  } catch(e){}
+}
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function getActive() { return conversations.find(c => c.id === activeId); }
+function ensureActive() {
+  if (!getActive()) {
+    const c = { id: uid(), title: 'New conversation', createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+    conversations.unshift(c);
+    activeId = c.id;
+    saveToStorage();
+  }
+}
+function deriveTitle(c) {
+  const fu = c.messages.find(m => m.role === 'user');
+  if (fu) { const t = fu.text.trim().replace(/\s+/g,' '); return t.length > 36 ? t.slice(0,36)+'...' : t; }
+  return 'New conversation';
+}
+function formatTime(ts) {
+  const d = new Date(ts), now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  const days = Math.floor((now - d) / 86400000);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return d.toLocaleDateString([], {weekday:'long'});
+  return d.toLocaleDateString([], {month:'short',day:'numeric'});
+}
+function countWords(s) { const m = s.match(/\b\w+\b/g); return m ? m.length : 0; }
+function estimateTokens(text) { return Math.ceil((text||'').length / 4); }
+function isMobile() { return window.matchMedia('(max-width: 900px)').matches; }
+
+let searchQuery = '';
+const COLOR_TAGS = ['#6366f1','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4'];
+let collapsedGroups = new Set();
+try { collapsedGroups = new Set(JSON.parse(localStorage.getItem('thinkly-collapsed-groups') || '[]')); } catch(e){}
+
+function renderSidebar() {
+  const convList = $('convList');
+  convList.innerHTML = '';
+  if (!conversations.length) return;
+  const q = searchQuery.trim().toLowerCase();
+  let list = conversations.filter(c => {
+    if (favOnly && !c.starred) return false;
+    if (starFilter === 'starred' && !c.starred) return false;
+    if (starFilter === 'unstarred' && c.starred) return false;
+    if (!q) return true;
+    if ((c.title||'').toLowerCase().includes(q)) return true;
+    return c.messages.some(m => (m.text||'').toLowerCase().includes(q));
+  });
+  if (!list.length) {
+    convList.innerHTML = '<div class="search-empty">No conversations found.</div>';
+    return;
+  }
+  const sorters = {
+    date: (a,b) => b.updatedAt - a.updatedAt,
+    title: (a,b) => (a.title||'').localeCompare(b.title||''),
+    length: (a,b) => (b.messages.length - a.messages.length)
+  };
+  const sorter = sorters[sortMode] || sorters.date;
+  const pinned = list.filter(c => c.pinned).sort(sorter);
+  const unpinned = list.filter(c => !c.pinned).sort(sorter);
+  if (pinned.length) appendGroup(convList, 'Pinned', pinned, q, true, 'pinned');
+  const groups = { Today: [], Yesterday: [], 'Previous 7 days': [], Older: [] };
+  const now = new Date();
+  unpinned.forEach(c => {
+    const d = new Date(c.updatedAt);
+    const days = Math.floor((now - d) / 86400000);
+    if (d.toDateString() === now.toDateString()) groups.Today.push(c);
+    else if (days < 2) groups.Yesterday.push(c);
+    else if (days < 7) groups['Previous 7 days'].push(c);
+    else groups.Older.push(c);
+  });
+  Object.entries(groups).forEach(([label, list]) => {
+    if (!list.length) return;
+    appendGroup(convList, label, list, q, false, label);
+  });
+}
+function appendGroup(container, label, list, q, pinned, key) {
+  const g = document.createElement('div');
+  g.className = 'conv-group' + (collapsedGroups.has(key) ? ' collapsed' : '');
+  g.textContent = label;
+  g.addEventListener('click', () => {
+    if (collapsedGroups.has(key)) collapsedGroups.delete(key); else collapsedGroups.add(key);
+    try { localStorage.setItem('thinkly-collapsed-groups', JSON.stringify([...collapsedGroups])); } catch(e){}
+    renderSidebar();
+  });
+  container.appendChild(g);
+  const wrap = document.createElement('div');
+  wrap.className = 'conv-group-items';
+  list.forEach((c, i) => wrap.appendChild(makeConvItem(c, q, i)));
+  container.appendChild(wrap);
+}
+function makeConvItem(c, q, idx) {
+  const item = document.createElement('div');
+  item.className = 'conv-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '');
+  item.dataset.id = c.id;
+  item.style.animationDelay = Math.min(idx * 0.03, 0.25) + 's';
+
+  if (c.color) {
+    const bar = document.createElement('div');
+    bar.className = 'conv-item__colorbar';
+    bar.style.background = c.color;
+    item.appendChild(bar);
+  }
+  const icon = document.createElement('div');
+  icon.className = 'conv-item__icon';
+  icon.innerHTML = ICONS.chat;
+  if (c.starred) {
+    const star = document.createElement('span');
+    star.className = 'conv-item__star';
+    star.innerHTML = ICONS.starFilled;
+    icon.appendChild(star);
+  }
+  item.appendChild(icon);
+
+  const body = document.createElement('div');
+  body.className = 'conv-item__body';
+  const title = document.createElement('div');
+  title.className = 'conv-item__title';
+  if (q) {
+    const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+    title.innerHTML = escapeHTML(c.title || deriveTitle(c)).replace(re, '<mark class="highlight">$1</mark>');
+  } else {
+    title.textContent = c.title || deriveTitle(c);
+  }
+  body.appendChild(title);
+
+  const meta = document.createElement('div');
+  meta.className = 'conv-item__meta';
+  const time = document.createElement('div');
+  time.className = 'conv-item__time';
+  time.textContent = formatTime(c.updatedAt);
+  const cnt = document.createElement('div');
+  cnt.className = 'conv-item__count';
+  cnt.textContent = String(c.messages.length);
+  meta.appendChild(time); meta.appendChild(cnt);
+  body.appendChild(meta);
+  item.appendChild(body);
+
+  const actions = document.createElement('div');
+  actions.className = 'conv-item__actions';
+
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'conv-item__action';
+  pinBtn.innerHTML = c.pinned ? ICONS.pinFilled : ICONS.pin;
+  pinBtn.title = c.pinned ? 'Unpin' : 'Pin';
+  pinBtn.addEventListener('click', e => { e.stopPropagation(); c.pinned = !c.pinned; saveToStorage(); renderSidebar(); });
+
+  const starBtn = document.createElement('button');
+  starBtn.className = 'conv-item__action';
+  starBtn.innerHTML = c.starred ? ICONS.starFilled : ICONS.star;
+  starBtn.title = c.starred ? 'Unstar' : 'Star';
+  starBtn.addEventListener('click', e => { e.stopPropagation(); c.starred = !c.starred; saveToStorage(); renderSidebar(); });
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'conv-item__action';
+  editBtn.innerHTML = ICONS.edit;
+  editBtn.title = 'Rename';
+  editBtn.addEventListener('click', e => { e.stopPropagation(); startRename(item, c); });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'conv-item__action conv-item__action--del';
+  delBtn.innerHTML = ICONS.trash;
+  delBtn.title = 'Delete';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); deleteConversation(c.id); });
+
+  actions.appendChild(pinBtn); actions.appendChild(starBtn);
+  actions.appendChild(editBtn); actions.appendChild(delBtn);
+  item.appendChild(actions);
+
+  item.addEventListener('click', () => switchConversation(c.id));
+  item.addEventListener('dblclick', e => { e.stopPropagation(); startRename(item, c); });
+  item.addEventListener('contextmenu', e => { e.preventDefault(); openConvContextMenu(e.clientX, e.clientY, c); });
+  return item;
+}
+function startRename(itemEl, conv) {
+  const bodyEl = itemEl.querySelector('.conv-item__body');
+  const titleEl = itemEl.querySelector('.conv-item__title');
+  const input = document.createElement('input');
+  input.type = 'text'; input.className = 'conv-item__rename';
+  input.value = conv.title || deriveTitle(conv);
+  input.maxLength = 60;
+  titleEl.style.display = 'none';
+  bodyEl.insertBefore(input, titleEl);
+  input.focus(); input.select();
+  const commit = () => {
+    const n = input.value.trim();
+    if (n) { conv.title = n; conv.updatedAt = Date.now(); saveToStorage(); }
+    renderSidebar();
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') renderSidebar(); });
+  input.addEventListener('blur', commit);
+  input.addEventListener('click', e => e.stopPropagation());
+}
+function deleteConversation(id) {
+  const idx = conversations.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  conversations.splice(idx, 1);
+  if (activeId === id) {
+    activeId = conversations[0]?.id || null;
+    if (!activeId) ensureActive();
+  }
+  saveToStorage(); renderSidebar();
+  if (getActive()) renderConversation(getActive());
+}
+function switchConversation(id) {
+  if (id === activeId) { closeSidebar(); return; }
+  activeId = id;
+  saveToStorage(); renderSidebar();
+  const c = getActive(); if (c) renderConversation(c);
+  closeSidebar();
+}
+function newConversation() {
+  const cur = getActive();
+  if (cur && cur.messages.length === 0) {
+    activeId = cur.id;
+    renderConversation(cur);
+  } else {
+    conversations = conversations.filter(c => c.messages.length > 0);
+    const c = { id: uid(), title: 'New conversation', createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+    conversations.unshift(c);
+    activeId = c.id;
+    renderConversation(c);
+  }
+  triggerConfetti();
+  saveToStorage(); renderSidebar();
+  if (!isMobile()) $('input').focus();
+}
+
+function openConvContextMenu(x, y, conv) {
+  document.querySelector('.context-menu')?.remove();
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  const menuW = 200, menuH = 280;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - menuH - 8)) + 'px';
+  const items = [
+    { icon: conv.pinned ? ICONS.pinFilled : ICONS.pin, label: conv.pinned ? 'Unpin' : 'Pin', action: () => { conv.pinned = !conv.pinned; saveToStorage(); renderSidebar(); } },
+    { icon: conv.starred ? ICONS.starFilled : ICONS.star, label: conv.starred ? 'Unstar' : 'Star as favorite', action: () => { conv.starred = !conv.starred; saveToStorage(); renderSidebar(); } },
+    { icon: ICONS.edit, label: 'Rename', action: () => { setTimeout(() => { const el = document.querySelector(`.conv-item[data-id="${conv.id}"]`); if (el) startRename(el, conv); }, 50); } },
+    { sep: true },
+    { icon: ICONS.palette, label: 'Color tag', action: () => openColorPicker(conv) },
+    { icon: ICONS.download, label: 'Export', action: () => exportConversation(conv) },
+    { icon: ICONS.share, label: 'Share link', action: () => shareConversation(conv) },
+    { sep: true },
+    { icon: ICONS.trash, label: 'Delete', danger: true, action: () => deleteConversation(conv.id) }
+  ];
+  items.forEach(it => {
+    if (it.sep) { const s = document.createElement('div'); s.className = 'context-menu-sep'; menu.appendChild(s); return; }
+    const btn = document.createElement('button');
+    btn.className = 'context-menu-item';
+    if (it.danger) btn.style.color = '#ef4444';
+    btn.innerHTML = `${it.icon} <span>${it.label}</span>`;
+    btn.addEventListener('click', () => { menu.remove(); it.action(); });
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    const off = e => {
+      if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', off); document.removeEventListener('contextmenu', off); }
+    };
+    document.addEventListener('click', off);
+    document.addEventListener('contextmenu', off);
+  }, 0);
+}
+
+function openColorPicker(conv) {
+  const popup = document.createElement('div');
+  popup.className = 'context-menu';
+  popup.style.top = '50%'; popup.style.left = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
+  popup.style.position = 'fixed';
+  let html = '<div style="padding:6px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;">Color tag</div><div style="display:flex;gap:6px;padding:4px;">';
+  html += '<button class="color-dot" data-color="" style="background:transparent;border:1px solid var(--stroke);" title="None"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+  COLOR_TAGS.forEach(c => { html += `<button class="color-dot" data-color="${c}" style="background:${c};"></button>`; });
+  html += '</div>';
+  popup.innerHTML = html;
+  document.body.appendChild(popup);
+  popup.querySelectorAll('.color-dot').forEach(b => {
+    b.addEventListener('click', () => {
+      const color = b.dataset.color;
+      if (color) conv.color = color; else delete conv.color;
+      saveToStorage(); renderSidebar();
+      popup.remove();
+    });
+  });
+  setTimeout(() => {
+    const off = e => { if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', off); } };
+    document.addEventListener('click', off);
+  }, 0);
+}
+
+$('sortBtn').addEventListener('click', () => {
+  const order = ['date','title','length'];
+  const labels = { date:'Date', title:'Title', length:'Length' };
+  sortMode = order[(order.indexOf(sortMode) + 1) % order.length];
+  $('sortLabel').textContent = labels[sortMode];
+  renderSidebar();
+});
+$('starFilterBtn').addEventListener('click', () => {
+  const order = ['all','starred','unstarred'];
+  const labels = { all:'All', starred:'Favorites', unstarred:'Others' };
+  starFilter = order[(order.indexOf(starFilter) + 1) % order.length];
+  $('starFilterLabel').textContent = labels[starFilter];
+  favOnly = starFilter === 'starred';
+  renderSidebar();
+});
+
+$('scrollTopBtn').addEventListener('click', () => {
+  $('messages').scrollTo({ top: 0, behavior: 'smooth' });
+});
+$('messages').addEventListener('scroll', () => {
+  const st = $('messages').scrollTop;
+  $('scrollTopBtn').classList.toggle('show', st > 400);
+});
+
+function streamDelay() { return streamSpeed === 'instant' ? 0 : streamSpeed === 'typewriter' ? 28 : 6; }
+
+async function streamMarkdownInto(el, lastUserText, attachments = []) {
+  return new Promise(resolve => {
+    let accumulated = '', finished = false;
+    el.innerHTML = '';
+    el.classList.remove('error');
+    abortController = new AbortController();
+    const signal = abortController.signal;
+
+    const setError = msg => {
+      if (finished) return; finished = true;
+      el.classList.add('error');
+      el.textContent = 'Error: ' + msg;
+      resolve({ text: el.textContent, stopped: false });
+    };
+    const setStopped = () => {
+      if (finished) return; finished = true;
+      if (accumulated) { el.innerHTML = renderMarkdown(accumulated); attachCodeCopyButtons(el); }
+      else el.textContent = 'Stopped.';
+      el.dataset.rawText = accumulated || el.textContent;
+      resolve({ text: accumulated || el.textContent, stopped: true });
+    };
+
+    fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: lastUserText,
+        persona: getPersona(),
+        images: attachments.map(a => a.dataUrl)
+      }),
+      signal
+    }).then(async res => {
+      if (res.status === 401) { setError('Session expired.'); showAuthModal(); return; }
+      if (!res.ok) { setError('HTTP ' + res.status); return; }
+      if (!res.body) { setError('No body'); return; }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (signal.aborted) { reader.cancel().catch(()=>{}); setStopped(); return; }
+          while (isPaused && !signal.aborted) await wait(100);
+          if (signal.aborted) { setStopped(); return; }
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+          for (const part of parts) {
+            if (!part.startsWith('data: ')) continue;
+            const payload = part.slice(6).trim();
+            if (payload === '[DONE]') {
+              if (!finished) {
+                finished = true;
+                el.innerHTML = accumulated ? renderMarkdown(accumulated) : 'Empty response.';
+                if (accumulated) attachCodeCopyButtons(el);
+                el.dataset.rawText = accumulated;
+                resolve({ text: accumulated, stopped: false });
+              }
+              return;
+            }
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.error) { setError(parsed.error); return; }
+              if (parsed.delta) {
+                accumulated += parsed.delta;
+                el.innerHTML = renderMarkdown(accumulated);
+                attachCodeCopyButtons(el);
+                el.dataset.rawText = accumulated;
+                messagesEl_scrollBottom(false);
+                const d = streamDelay();
+                if (d > 0) await wait(d);
+              }
+            } catch(e){}
+          }
+        }
+        if (!finished) {
+          finished = true;
+          el.innerHTML = accumulated ? renderMarkdown(accumulated) : 'Empty response.';
+          if (accumulated) attachCodeCopyButtons(el);
+          el.dataset.rawText = accumulated;
+          resolve({ text: accumulated, stopped: false });
+        }
+      } catch(err) {
+        if (signal.aborted) { setStopped(); return; }
+        setError('Error: ' + err.message);
+      }
+    }).catch(err => {
+      if (signal.aborted) { setStopped(); return; }
+      setError('Failed: ' + err.message);
+    });
+  });
+}
+function messagesEl_scrollBottom(smooth) {
+  const el = $('messages');
+  requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }));
+}
+function attachCodeCopyButtons(bubble) {
+  bubble.querySelectorAll('.code-block__copy').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const code = btn.closest('.code-block').querySelector('pre code');
+      navigator.clipboard.writeText(code.textContent);
+      btn.textContent = 'Copied';
+      setTimeout(() => btn.textContent = 'Copy', 1200);
+    });
+  });
+}
+
+function createMessage(role, text, messageIndex) {
+  const row = document.createElement('div');
+  row.className = `msg msg--${role}`;
+  if (role === 'bot') {
+    const av = document.createElement('div');
+    av.className = 'msg__avatar';
+    av.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12v2.6h-4.2v8.4h-3.6v-8.4H6z" fill="#fff"/></svg>';
+    row.appendChild(av);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = `bubble bubble--${role}`;
+  bubble.dataset.rawText = text || '';
+  if (text) {
+    if (role === 'bot') { bubble.innerHTML = renderMarkdown(text); attachCodeCopyButtons(bubble); }
+    else bubble.textContent = text;
+  }
+  row.appendChild(bubble);
+  if (role === 'bot' && typeof messageIndex === 'number') attachBotActions(row, bubble, messageIndex);
+  if (role === 'user' && typeof messageIndex === 'number') {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action';
+    editBtn.title = 'Edit & resend';
+    editBtn.innerHTML = ICONS.edit;
+    editBtn.style.cssText = 'position:absolute;top:-6px;right:8px;background:var(--surface);border:1px solid var(--stroke);width:26px;height:26px;';
+    editBtn.addEventListener('click', e => { e.stopPropagation(); editUserMessage(messageIndex); });
+    row.style.position = 'relative';
+    row.appendChild(editBtn);
+  }
+  return { row, bubble };
+}
+function attachBotActions(row, bubble, messageIndex) {
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'msg-action'; copyBtn.title = 'Copy';
+  copyBtn.innerHTML = ICONS.copy;
+  copyBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(bubble.dataset.rawText || '');
+    copyBtn.innerHTML = ICONS.check;
+    setTimeout(() => copyBtn.innerHTML = ICONS.copy, 1200);
+  });
+  actions.appendChild(copyBtn);
+
+  const upBtn = document.createElement('button');
+  upBtn.className = 'msg-action'; upBtn.title = 'Good response';
+  upBtn.innerHTML = ICONS.thumbUp;
+  upBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    upBtn.classList.toggle('active');
+    const c = getActive();
+    if (c?.messages[messageIndex]) { c.messages[messageIndex].reaction = upBtn.classList.contains('active') ? 'up' : null; saveToStorage(); }
+  });
+  actions.appendChild(upBtn);
+
+  const downBtn = document.createElement('button');
+  downBtn.className = 'msg-action'; downBtn.title = 'Bad response';
+  downBtn.innerHTML = ICONS.thumbDown;
+  downBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    downBtn.classList.toggle('active');
+    const c = getActive();
+    if (c?.messages[messageIndex]) { c.messages[messageIndex].reaction = downBtn.classList.contains('active') ? 'down' : null; saveToStorage(); }
+  });
+  actions.appendChild(downBtn);
+
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'msg-action'; speakBtn.title = 'Read aloud';
+  speakBtn.innerHTML = ICONS.speaker;
+  speakBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!('speechSynthesis' in window)) return;
+    if (speakBtn.classList.contains('tts-active')) { window.speechSynthesis.cancel(); speakBtn.classList.remove('tts-active'); return; }
+    const clean = (bubble.dataset.rawText || '').replace(/```[\s\S]*?```/g,' code ').replace(/[*_#>~\[\]()]/g,' ').trim();
+    const u = new SpeechSynthesisUtterance(clean.slice(0, 4000));
+    u.onend = () => speakBtn.classList.remove('tts-active');
+    speakBtn.classList.add('tts-active');
+    window.speechSynthesis.speak(u);
+  });
+  actions.appendChild(speakBtn);
+
+  const regenBtn = document.createElement('button');
+  regenBtn.className = 'msg-action'; regenBtn.title = 'Regenerate';
+  regenBtn.innerHTML = ICONS.refresh;
+  regenBtn.addEventListener('click', e => { e.stopPropagation(); regenerateMessage(messageIndex); });
+  actions.appendChild(regenBtn);
+
+  const starBtn = document.createElement('button');
+  starBtn.className = 'msg-action'; starBtn.title = 'Star';
+  starBtn.innerHTML = ICONS.star;
+  starBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const c = getActive();
+    if (c?.messages[messageIndex]) {
+      c.messages[messageIndex].starred = !c.messages[messageIndex].starred;
+      row.classList.toggle('starred', c.messages[messageIndex].starred);
+      starBtn.classList.toggle('active', c.messages[messageIndex].starred);
+      starBtn.innerHTML = c.messages[messageIndex].starred ? ICONS.starFilled : ICONS.star;
+      saveToStorage();
+    }
+  });
+  actions.appendChild(starBtn);
+
+  bubble.appendChild(actions);
+
+  if (showStats) {
+    const raw = bubble.dataset.rawText || '';
+    const tokens = estimateTokens(raw);
+    const words = countWords(raw);
+    const stats = document.createElement('div');
+    stats.className = 'msg__stats';
+    stats.innerHTML = `<span>${tokens} tokens</span><span>${words} words</span>`;
+    bubble.appendChild(stats);
+  }
+}
+function renderConversation(c) {
+  const messagesEl = $('messages');
+  messagesEl.innerHTML = '';
+  if (!c) return;
+  c.messages.forEach((m, i) => {
+    let text = m.text;
+    if (m.branches && m.branches.length > 1 && typeof m.branchIndex === 'number') text = m.branches[m.branchIndex];
+    const { row, bubble } = createMessage(m.role, text, i);
+    if (m.attachments?.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-attachments';
+      m.attachments.forEach(att => {
+        const box = document.createElement('div');
+        box.className = 'msg-attachment';
+        const img = document.createElement('img');
+        img.src = att.dataUrl;
+        box.appendChild(img);
+        wrap.appendChild(box);
+      });
+      bubble.insertBefore(wrap, bubble.firstChild);
+    }
+    if (m.reaction === 'up') { const btns = bubble.querySelectorAll('.msg-action'); if (btns[1]) btns[1].classList.add('active'); }
+    if (m.reaction === 'down') { const btns = bubble.querySelectorAll('.msg-action'); if (btns[2]) btns[2].classList.add('active'); }
+    if (m.starred) {
+      row.classList.add('starred');
+      const btns = bubble.querySelectorAll('.msg-action');
+      if (btns[5]) { btns[5].classList.add('active'); btns[5].innerHTML = ICONS.starFilled; }
+    }
+    messagesEl.appendChild(row);
+    if (m.branches && m.branches.length > 1 && m.role === 'bot') {
+      const nav = document.createElement('div');
+      nav.className = 'branch-nav';
+      const prev = document.createElement('button');
+      prev.innerHTML = ICONS.chevronLeft;
+      const counter = document.createElement('span');
+      counter.textContent = `${(m.branchIndex || 0) + 1} / ${m.branches.length}`;
+      const next = document.createElement('button');
+      next.innerHTML = ICONS.chevronRight;
+      prev.addEventListener('click', () => {
+        m.branchIndex = ((m.branchIndex || 0) - 1 + m.branches.length) % m.branches.length;
+        m.text = m.branches[m.branchIndex];
+        saveToStorage(); renderConversation(c);
+      });
+      next.addEventListener('click', () => {
+        m.branchIndex = ((m.branchIndex || 0) + 1) % m.branches.length;
+        m.text = m.branches[m.branchIndex];
+        saveToStorage(); renderConversation(c);
+      });
+      nav.appendChild(prev); nav.appendChild(counter); nav.appendChild(next);
+      messagesEl.appendChild(nav);
+    }
+  });
+  if (!c.messages.length) bootGreeting();
+  else messagesEl_scrollBottom(false);
+  updateTokenCounter();
+}
+
+function editUserMessage(index) {
+  const c = getActive(); if (!c) return;
+  const m = c.messages[index];
+  if (!m || m.role !== 'user') return;
+  const rows = $('messages').querySelectorAll('.msg--user');
+  let count = 0, target = null;
+  for (let i = 0; i <= index; i++) {
+    if (c.messages[i].role === 'user') {
+      if (i === index) { target = rows[count]; break; }
+      count++;
+    }
+  }
+  if (!target) return;
+  const bubble = target.querySelector('.bubble');
+  bubble.innerHTML = '';
+  const ta = document.createElement('textarea');
+  ta.value = m.text;
+  ta.style.cssText = 'width:100%;min-height:60px;padding:10px;border-radius:8px;border:1.5px solid var(--brand-1);background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;outline:0;resize:vertical;';
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:6px;justify-content:flex-end;margin-top:6px;';
+  const cancelB = document.createElement('button');
+  cancelB.textContent = 'Cancel';
+  cancelB.style.cssText = 'padding:6px 12px;border-radius:6px;border:1px solid var(--stroke);color:var(--muted);font-size:12px;';
+  const saveB = document.createElement('button');
+  saveB.textContent = 'Save & resend';
+  saveB.style.cssText = 'padding:6px 12px;border-radius:6px;background:var(--brand-1);color:#fff;font-size:12px;font-weight:600;';
+  btns.appendChild(cancelB); btns.appendChild(saveB);
+  bubble.appendChild(ta); bubble.appendChild(btns);
+  ta.focus();
+  cancelB.onclick = () => renderConversation(c);
+  saveB.onclick = () => {
+    const nt = ta.value.trim();
+    if (!nt) return;
+    c.messages = c.messages.slice(0, index);
+    saveToStorage();
+    renderConversation(c);
+    isBusy = false;
+    handleSend(nt);
+  };
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveB.click();
+    else if (e.key === 'Escape') cancelB.click();
+  });
+}
+
+async function regenerateMessage(messageIndex) {
+  const c = getActive(); if (!c || isBusy) return;
+  let userText = '';
+  for (let i = messageIndex - 1; i >= 0; i--) {
+    if (c.messages[i].role === 'user') { userText = c.messages[i].text; break; }
+  }
+  if (!userText) return;
+  const oldMsg = c.messages[messageIndex];
+  if (oldMsg.branches && oldMsg.branches.length) { }
+  else { oldMsg.branches = [oldMsg.text]; oldMsg.branchIndex = 0; }
+  c.messages = c.messages.slice(0, messageIndex + 1);
+  saveToStorage(); renderConversation(c);
+  isBusy = true;
+  $('composerInner').classList.add('busy');
+  const typingRow = document.createElement('div');
+  typingRow.className = 'msg msg--bot';
+  typingRow.innerHTML = '<div class="msg__avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12v2.6h-4.2v8.4h-3.6v-8.4H6z" fill="#fff"/></svg></div><div class="bubble bubble--bot"><div class="typing"><span></span><span></span><span></span></div></div>';
+  $('messages').appendChild(typingRow);
+  await wait(200);
+  typingRow.remove();
+  const { row, bubble } = createMessage('bot', '');
+  $('messages').appendChild(row);
+  const result = await streamMarkdownInto(bubble, userText);
+  const lastMsg = c.messages[c.messages.length - 1];
+  if (lastMsg.branches) { lastMsg.branches.push(result.text); lastMsg.branchIndex = lastMsg.branches.length - 1; }
+  else { c.messages.push({ role:'bot', text: result.text, time: Date.now() }); }
+  c.updatedAt = Date.now(); saveToStorage(); renderSidebar();
+  attachBotActions(row, bubble, c.messages.length - 1);
+  isBusy = false;
+  $('composerInner').classList.remove('busy');
+  abortController = null;
+}
+
+async function handleSend(rawText) {
+  if (!currentUser) { showAuthModal(); return; }
+  const text = (rawText ?? $('input').value).trim();
+  const attachments = pendingAttachments.length ? [...pendingAttachments] : [];
+  if (!text && !attachments.length) return;
+  if (isBusy) return;
+
+  if (text.startsWith('/')) {
+    const handled = handleSlashCommand(text);
+    if (handled) { $('input').value = ''; autoGrow(); syncSendButton(); return; }
+  }
+
+  $('input').value = '';
+  pendingAttachments = [];
+  renderAttachmentPreview();
+  autoGrow(); syncSendButton();
+  document.querySelector('.suggestions')?.remove();
+
+  const { row: userRow, bubble: userBubble } = createMessage('user', text);
+  if (attachments.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-attachments';
+    attachments.forEach(att => {
+      const box = document.createElement('div'); box.className = 'msg-attachment';
+      const img = document.createElement('img'); img.src = att.dataUrl;
+      box.appendChild(img); wrap.appendChild(box);
+    });
+    userBubble.insertBefore(wrap, userBubble.firstChild);
+  }
+  $('messages').appendChild(userRow);
+  messagesEl_scrollBottom();
+  pushToConversation('user', text, attachments);
+
+  isBusy = true;
+  $('composerInner').classList.add('busy');
+  $('avatar').classList.add('thinking');
+  const typingRow = showTyping();
+  await wait(200);
+  typingRow.remove();
+
+  const { row: botRow, bubble: botBubble } = createMessage('bot', '');
+  $('messages').appendChild(botRow);
+  messagesEl_scrollBottom();
+
+  autoDetectPersona(text);
+  const result = await streamMarkdownInto(botBubble, text, attachments);
+  pushToConversation('bot', result.text);
+
+  const c = getActive();
+  if (c) attachBotActions(botRow, botBubble, c.messages.length - 1);
+
+  $('avatar').classList.remove('thinking');
+  isBusy = false;
+  $('composerInner').classList.remove('busy');
+  abortController = null;
+  setTimeout(() => renderSuggestions(generateSuggestions(result.text)), 300);
+  if (!isMobile()) $('input').focus();
+  updateTokenCounter();
+}
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg msg--bot';
+  row.innerHTML = '<div class="msg__avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12v2.6h-4.2v8.4h-3.6v-8.4H6z" fill="#fff"/></svg></div><div class="bubble bubble--bot"><div class="typing"><span></span><span></span><span></span></div></div>';
+  $('messages').appendChild(row);
+  messagesEl_scrollBottom();
+  return row;
+}
+function pushToConversation(role, text, attachments) {
+  const c = getActive(); if (!c) return;
+  const msg = { role, text, time: Date.now() };
+  if (attachments?.length) msg.attachments = attachments;
+  c.messages.push(msg);
+  c.updatedAt = Date.now();
+  if (role === 'user' && (c.title === 'New conversation' || !c.title)) c.title = deriveTitle(c);
+  saveToStorage(); renderSidebar();
+}
+function generateSuggestions(text) {
+  const lower = (text || '').toLowerCase();
+  if (lower.includes('code') || /```/.test(text)) return ['Explain this code', 'Add comments', 'Show an example'];
+  if (lower.includes('email') || lower.includes('letter')) return ['Make it shorter', 'More formal', 'Add a CTA'];
+  if (lower.includes('list') || /\d+\./.test(text)) return ['Expand step 1', 'Give an example', 'Common mistakes?'];
+  return ['Tell me more', 'Give an example', 'Explain simpler'];
+}
+function renderSuggestions(items) {
+  document.querySelector('.suggestions')?.remove();
+  if (!items.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'suggestions';
+  items.forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'suggestion-chip';
+    chip.textContent = s;
+    chip.addEventListener('click', () => { wrap.remove(); handleSend(s); });
+    wrap.appendChild(chip);
+  });
+  $('messages').appendChild(wrap);
+  messagesEl_scrollBottom();
+}
+
+$('pauseBtn').addEventListener('click', () => {
+  isPaused = !isPaused;
+  $('composerInner').classList.toggle('paused', isPaused);
+  $('pauseBtn').innerHTML = isPaused ? ICONS.play : ICONS.pause;
+  showToast(isPaused ? 'Paused' : 'Resumed', '', 'info', 1200);
+});
+
+$('stopBtn').addEventListener('click', () => {
+  if (abortController) { abortController.abort(); abortController = null; }
+});
+
+const SLASH_COMMANDS = [
+  { cmd:'/help', desc:'Show all commands' },
+  { cmd:'/clear', desc:'Clear current chat' },
+  { cmd:'/new', desc:'New conversation' },
+  { cmd:'/export', desc:'Export chat as Markdown' },
+  { cmd:'/share', desc:'Copy share link' },
+  { cmd:'/stats', desc:'Show usage stats' },
+  { cmd:'/theme', desc:'Toggle theme' },
+  { cmd:'/zen', desc:'Toggle zen mode' },
+  { cmd:'/persona', desc:'Change persona' },
+  { cmd:'/find', desc:'Find in conversation' },
+  { cmd:'/search', desc:'Global search' }
+];
+function handleSlashCommand(input) {
+  const parts = input.trim().split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const args = parts.slice(1).join(' ');
+  switch (cmd) {
+    case '/help': showToast('Commands', SLASH_COMMANDS.map(c => `${c.cmd} - ${c.desc}`).join('\n'), 'info', 6000); return true;
+    case '/clear': clearCurrentChat(); return true;
+    case '/new': newConversation(); return true;
+    case '/export': exportConversation(getActive()); return true;
+    case '/share': shareConversation(getActive()); return true;
+    case '/stats': renderStats(); $('statsModal').classList.add('show'); return true;
+    case '/theme': themeIndex = (themeIndex + 1) % THEMES.length; applyTheme(THEMES[themeIndex]); return true;
+    case '/zen': toggleZen(); return true;
+    case '/persona':
+      if (args && PERSONAS.find(p => p.id === args)) { setPersona(args); showToast('Persona: ' + args, '', 'success'); }
+      else showToast('Usage', '/persona assistant|coder|writer|tutor|analyst|concise', 'info');
+      return true;
+    case '/find': openMsgSearch(); return true;
+    case '/search': openGlobalSearch(); return true;
+    default: return false;
+  }
+}
+function updateSlashMenu() {
+  const val = $('input').value;
+  const menu = $('slashMenu');
+  if (!val.startsWith('/')) { menu.classList.remove('show'); return; }
+  const query = val.slice(1).toLowerCase();
+  const matches = SLASH_COMMANDS.filter(c => c.cmd.slice(1).startsWith(query));
+  if (!matches.length) { menu.classList.remove('show'); return; }
+  menu.innerHTML = '';
+  matches.forEach(m => {
+    const el = document.createElement('div');
+    el.className = 'slash-item';
+    el.innerHTML = `<code>${m.cmd}</code><span class="slash-item__desc">${m.desc}</span>`;
+    el.addEventListener('click', () => {
+      $('input').value = m.cmd + ' ';
+      menu.classList.remove('show');
+      $('input').focus();
+      autoGrow(); syncSendButton();
+    });
+    menu.appendChild(el);
+  });
+  menu.classList.add('show');
+}
+
+const PERSONAS = [
+  { id:'assistant', name:'Assistant', prompt:'You are a helpful, friendly AI assistant.' },
+  { id:'coder', name:'Coder', prompt:'You are an expert programmer. Give clean, well-commented code.' },
+  { id:'writer', name:'Writer', prompt:'You are a creative writer. Use vivid, engaging language.' },
+  { id:'tutor', name:'Tutor', prompt:'You are a patient teacher. Explain step by step with examples.' },
+  { id:'analyst', name:'Analyst', prompt:'You are a sharp data analyst. Break down problems logically.' },
+  { id:'concise', name:'Concise', prompt:'You give extremely brief, direct answers.' }
+];
+let currentPersona = 'assistant';
+try { currentPersona = localStorage.getItem('thinkly-persona') || 'assistant'; } catch(e){}
+function getPersona() { return PERSONAS.find(p => p.id === currentPersona)?.prompt || PERSONAS[0].prompt; }
+function setPersona(id) {
+  if (!PERSONAS.find(p => p.id === id)) return;
+  currentPersona = id;
+  try { localStorage.setItem('thinkly-persona', id); } catch(e){}
+}
+function autoDetectPersona(text) {
+  if (!text) return currentPersona;
+  const l = text.toLowerCase();
+  if (l.includes('code') || l.includes('function') || /```/.test(text)) return 'coder';
+  if (l.includes('write') || l.includes('essay') || l.includes('poem')) return 'writer';
+  if (l.includes('explain') || l.includes('teach') || l.includes('what is')) return 'tutor';
+  return currentPersona;
+}
+
+function updateTokenCounter() {
+  const counter = $('tokenCounter');
+  if (!counter) return;
+  if (!showTokenCounter) { counter.classList.remove('show'); return; }
+  counter.classList.add('show');
+  let total = 0;
+  const c = getActive();
+  if (c) c.messages.forEach(m => total += estimateTokens(m.text || ''));
+  const draft = estimateTokens($('input').value);
+  counter.textContent = `${total} (${draft} draft) tokens`;
+}
+
+function triggerConfetti() {
+  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#06b6d4'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDelay = Math.random() * 0.5 + 's';
+    p.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 3000);
+  }
+}
+
+function exportConversation(c) {
+  if (!c || !c.messages.length) { showToast('Nothing to export', '', 'warning'); return; }
+  const lines = [`# ${c.title || 'Conversation'}`, `\n*Exported ${new Date().toLocaleString()}*\n`];
+  c.messages.forEach(m => {
+    lines.push(`## ${m.role === 'user' ? 'You' : 'Thinkly'}`);
+    lines.push(m.text || ''); lines.push('');
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(c.title || 'conversation').slice(0,40)}.md`;
+  a.click();
+  showToast('Exported', '', 'success');
+}
+function exportAllAsJSON() {
+  const blob = new Blob([JSON.stringify(conversations, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `thinkly-all-${Date.now()}.json`;
+  a.click();
+  showToast('Backup saved', '', 'success');
+}
+document.addEventListener('dragover', e => { e.preventDefault(); $('importDrop').classList.add('show'); });
+document.addEventListener('dragleave', e => { if (e.target === document || e.clientX === 0) $('importDrop').classList.remove('show'); });
+document.addEventListener('drop', async e => {
+  e.preventDefault();
+  $('importDrop').classList.remove('show');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) throw new Error('Not an array');
+    data.forEach(c => { if (c.id && !conversations.find(x => x.id === c.id)) conversations.push(c); });
+    saveToStorage(); renderSidebar();
+    showToast('Imported', `${data.length} conversations`, 'success');
+  } catch(err) { showToast('Import failed', err.message, 'error'); }
+});
+
+const PLUGINS = [
+  { id:'uppercase', name:'UPPERCASE plugin', desc:'Adds /upper command', enabled:false, register:() => { SLASH_COMMANDS.push({ cmd:'/upper', desc:'Uppercase text' }); }},
+  { id:'timestamp', name:'Timestamp plugin', desc:'Shows timestamps on messages', enabled:false, register:() => { showTimestamps = true; }},
+  { id:'coinflip', name:'Coin flip', desc:'Adds /flip command', enabled:false, register:() => { SLASH_COMMANDS.push({ cmd:'/flip', desc:'Flip a coin' }); }}
+];
+
+let memory = [];
+try { memory = JSON.parse(localStorage.getItem('thinkly-memory') || '[]'); } catch(e){}
+function saveMemory() { try { localStorage.setItem('thinkly-memory', JSON.stringify(memory)); } catch(e){} }
+function renderMemory() {
+  const list = $('memoryList');
+  list.innerHTML = '';
+  if (!memory.length) { list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12.5px;padding:10px;">No memory yet.</div>'; return; }
+  memory.forEach((m, i) => {
+    const item = document.createElement('div');
+    item.className = 'memory-item';
+    item.innerHTML = `<div class="memory-item__text">${escapeHTML(m)}</div><button class="memory-item__del">${ICONS.x}</button>`;
+    item.querySelector('.memory-item__del').addEventListener('click', () => { memory.splice(i, 1); saveMemory(); renderMemory(); });
+    list.appendChild(item);
+  });
+}
+$('memoryAdd').addEventListener('click', () => {
+  const v = $('memoryInput').value.trim();
+  if (!v) return;
+  memory.push(v); saveMemory(); renderMemory();
+  $('memoryInput').value = '';
+});
+
+let kb = [];
+try { kb = JSON.parse(localStorage.getItem('thinkly-kb') || '[]'); } catch(e){}
+function saveKB() { try { localStorage.setItem('thinkly-kb', JSON.stringify(kb)); } catch(e){} }
+function renderKB() {
+  const list = $('kbList');
+  list.innerHTML = '';
+  if (!kb.length) { list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12.5px;padding:10px;">No docs yet.</div>'; return; }
+  kb.forEach((d, i) => {
+    const item = document.createElement('div');
+    item.className = 'memory-item';
+    item.innerHTML = `<div class="memory-item__text"><strong>${escapeHTML(d.name)}</strong><div style="color:var(--muted);font-size:11px;margin-top:2px;">${d.content.length} chars</div></div><button class="memory-item__del">${ICONS.x}</button>`;
+    item.querySelector('.memory-item__del').addEventListener('click', () => { kb.splice(i, 1); saveKB(); renderKB(); });
+    list.appendChild(item);
+  });
+}
+$('kbAdd').addEventListener('click', () => {
+  const name = $('kbName').value.trim();
+  const content = $('kbContent').value.trim();
+  if (!name || !content) return;
+  kb.push({ name, content }); saveKB(); renderKB();
+  $('kbName').value = ''; $('kbContent').value = '';
+});
+
+function computeStats() {
+  let total = 0, user = 0, bot = 0, words = 0, streak = 0;
+  const daily = {};
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    daily[d.toISOString().slice(0, 10)] = 0;
+  }
+  conversations.forEach(c => {
+    c.messages.forEach(m => {
+      total++;
+      if (m.role === 'user') user++; else bot++;
+      words += (m.text || '').split(/\s+/).filter(Boolean).length;
+      const day = new Date(m.time || c.createdAt).toISOString().slice(0, 10);
+      if (day in daily) daily[day]++;
+    });
+  });
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const k = d.toISOString().slice(0, 10);
+    const has = conversations.some(c => c.messages.some(m => new Date(m.time || c.createdAt).toISOString().slice(0,10) === k));
+    if (has) streak++; else if (i > 0) break;
+  }
+  return { total, user, bot, words, streak, daily, convs: conversations.length };
+}
+function renderStats() {
+  const s = computeStats();
+  $('statsGrid').innerHTML = `
+    <div style="padding:14px;border:1px solid var(--stroke);border-radius:12px;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--brand-1);">${s.convs}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Conversations</div></div>
+    <div style="padding:14px;border:1px solid var(--stroke);border-radius:12px;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--brand-1);">${s.total}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Messages</div></div>
+    <div style="padding:14px;border:1px solid var(--stroke);border-radius:12px;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--brand-1);">${s.streak}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Day streak</div></div>
+    <div style="padding:14px;border:1px solid var(--stroke);border-radius:12px;text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--brand-1);">${s.words}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Words</div></div>
+  `;
+  const chart = $('statsChart');
+  chart.innerHTML = '';
+  const entries = Object.entries(s.daily);
+  const max = Math.max(1, ...entries.map(([_, v]) => v));
+  entries.forEach(([day, v]) => {
+    const bar = document.createElement('div');
+    bar.style.cssText = `flex:1;height:${Math.max(4, (v/max)*100)}%;background:linear-gradient(180deg,var(--brand-1),var(--brand-2));border-radius:4px 4px 0 0;min-height:4px;`;
+    bar.title = `${day}: ${v}`;
+    chart.appendChild(bar);
+  });
+}
+
+function openGlobalSearch() {
+  $('globalSearchModal').classList.add('show');
+  $('globalSearchInput').value = '';
+  renderGlobalSearch('');
+  setTimeout(() => $('globalSearchInput').focus(), 50);
+}
+function renderGlobalSearch(query) {
+  const list = $('globalSearchList');
+  list.innerHTML = '';
+  const q = query.trim().toLowerCase();
+  if (!q) { list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">Type to search...</div>'; return; }
+  const results = [];
+  conversations.forEach(c => {
+    c.messages.forEach((m, i) => {
+      const t = (m.text || '').toLowerCase();
+      if (t.includes(q)) {
+        const idx = t.indexOf(q);
+        const start = Math.max(0, idx - 40);
+        const end = Math.min(t.length, idx + q.length + 80);
+        results.push({ c, i, preview: m.text.slice(start, end), role: m.role });
+      }
+    });
+  });
+  results.sort((a, b) => (b.c.updatedAt || 0) - (a.c.updatedAt || 0));
+  results.slice(0, 30).forEach(r => {
+    const item = document.createElement('button');
+    item.style.cssText = 'display:block;width:100%;padding:10px 14px;border-radius:10px;text-align:left;color:var(--text);margin-bottom:2px;';
+    const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+    const previewHTML = escapeHTML(r.preview).replace(re, '<mark style="background:rgba(250,204,21,.5);">$1</mark>');
+    item.innerHTML = `<div style="font-size:13px;font-weight:600;margin-bottom:4px;">${escapeHTML(r.c.title || deriveTitle(r.c))}</div><div style="font-size:12px;color:var(--muted);">${previewHTML}</div><div style="font-size:10.5px;color:var(--muted);margin-top:4px;">${r.role === 'user' ? 'You' : 'Thinkly'}</div>`;
+    item.addEventListener('click', () => {
+      $('globalSearchModal').classList.remove('show');
+      switchConversation(r.c.id);
+      setTimeout(() => {
+        const rows = $('messages').querySelectorAll('.msg');
+        if (rows[r.i]) {
+          rows[r.i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          rows[r.i].animate([{ background: 'rgba(250,204,21,.4)' }, { background: 'transparent' }], { duration: 2000 });
+        }
+      }, 500);
+    });
+    list.appendChild(item);
+  });
+  if (!results.length) list.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">No matches.</div>';
+}
+
+let msgSearchHits = [], msgSearchCurrent = 0;
+function openMsgSearch() {
+  $('msgSearchBar').classList.add('show');
+  setTimeout(() => $('msgSearchInput').focus(), 50);
+}
+function closeMsgSearch() {
+  $('msgSearchBar').classList.remove('show');
+  $('msgSearchInput').value = '';
+  clearMsgSearchHighlights();
+  $('msgSearchCount').textContent = '0 / 0';
+}
+function clearMsgSearchHighlights() {
+  $('messages').querySelectorAll('mark.search-hit').forEach(m => {
+    const p = m.parentNode;
+    p.replaceChild(document.createTextNode(m.textContent), m);
+    p.normalize();
+  });
+  msgSearchHits = []; msgSearchCurrent = 0;
+}
+function performMsgSearch(query) {
+  clearMsgSearchHighlights();
+  if (!query) { $('msgSearchCount').textContent = '0 / 0'; return; }
+  const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const walker = document.createTreeWalker($('messages'), NodeFilter.SHOW_TEXT, {
+    acceptNode: node => {
+      if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if (node.parentElement.closest('.code-block__head, .msg-actions, .suggestions')) return NodeFilter.FILTER_REJECT;
+      if (node.parentElement.tagName === 'MARK') return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    const text = node.nodeValue;
+    const parts = []; let last = 0; let m;
+    re.lastIndex = 0;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) parts.push({ t:'text', v: text.slice(last, m.index) });
+      parts.push({ t:'mark', v: m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) parts.push({ t:'text', v: text.slice(last) });
+    if (!parts.some(p => p.t === 'mark')) return;
+    const frag = document.createDocumentFragment();
+    parts.forEach(p => {
+      if (p.t === 'mark') {
+        const el = document.createElement('mark');
+        el.className = 'search-hit'; el.textContent = p.v;
+        el.style.cssText = 'background:rgba(250,204,21,.55);border-radius:2px;padding:0 2px;';
+        frag.appendChild(el); msgSearchHits.push(el);
+      } else frag.appendChild(document.createTextNode(p.v));
+    });
+    node.parentNode.replaceChild(frag, node);
+  });
+  if (msgSearchHits.length) {
+    msgSearchCurrent = 0;
+    updateMsgSearchActive();
+    $('msgSearchCount').textContent = `${msgSearchCurrent+1} / ${msgSearchHits.length}`;
+  } else $('msgSearchCount').textContent = '0 / 0';
+}
+function updateMsgSearchActive() {
+  msgSearchHits.forEach((h, i) => {
+    h.style.background = i === msgSearchCurrent ? '#f59e0b' : 'rgba(250,204,21,.55)';
+    h.style.color = i === msgSearchCurrent ? '#fff' : 'inherit';
+  });
+  if (msgSearchHits[msgSearchCurrent]) msgSearchHits[msgSearchCurrent].scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+const EMOJI_CATS = {
+  'Smileys':['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
+  'Hearts':['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💌','💋','🌹','🥀','🌺','🌷','🌸','🌼','🌻'],
+  'Hands':['👋','🤚','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','💪','🦾','🖕'],
+  'Food':['🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪'],
+  'Animals':['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🕸️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔'],
+  'Travel':['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🦯','🦽','🦼','🛴','🚲','🛵','🏍️','🛺','🚨','🚔','🚍','🚘','🚖','🚡','🚠','🚟','🚃','🚋','🚞','🚝','🚄','🚅','🚈','🚂','🚆','🚇','🚊','🚉','✈️','🛫','🛬','🛩️','💺','🛰️','🚀','🛸','🚁','🛶','⛵','🚤','🛥️','🛳️','⛴️','🚢','⚓','⛽','🚧','🚦','🚥','🚏','🗺️','🗿','🗽','🗼','🏰','🏯','🏟️','🎡','🎢','🎠','⛲','⛱️','🏖️','🏝️','🏜️','🌋','⛰️','🏔️','🗻','🏕️','⛺','🏠','🏡','🏘️','🏚️','🏗️','🏭','🏢','🏬','🏣','🏤','🏥','🏦','🏨','🏪','🏫','🏩','💒','🏛️','⛪','🕌','🕍','🛕','🕋','⛩️','🛤️','🛣️','🗾','🎑','🏞️','🌅','🌄','🌠','🎇','🎆','🌇','🌆','🏙️','🌃','🌌','🌉','🌁'],
+  'Symbols':['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','☸️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','🆔','⚛️','🉑','☢️','☣️','📴','📳','🈶','🈚','🈸','🈺','🈷️','✴️','🆚','💮','🉐','㊙️','㊗️','🈴','🈵','🈹','🈲','🅰️','🅱️','🆎','🆑','🅾️','🆘','❌','⭕','🛑','⛔','📛','🚫','💯','💢','♨️','🚷','🚯','🚳','🚱','🔞','📵','🚭','❗','❕','❓','❔','‼️','⁉️','🔅','🔆','〽️','⚠️','🚸','🔱','⚜️','🔰','♻️','✅','🈯','💹','❇️','✳️','❎','🌐','💠','Ⓜ️','🌀','💤','🏧','🚾','♿','🅿️','🈳','🈂️','🛂','🛃','🛄','🛅','🚹','🚺','🚼','🚻','🚮','🎦','📶','🈁','🔣','ℹ️','🔤','🔡','🔠','🆖','🆗','🆙','🆒','🆕','🆓']
+};
+let currentEmojiCat = 'Smileys';
+function renderEmojiPicker() {
+  const catEl = $('emojiCat'), gridEl = $('emojiGrid');
+  catEl.innerHTML = '';
+  Object.keys(EMOJI_CATS).forEach(cat => {
+    const b = document.createElement('button');
+    b.className = 'emoji-cat-btn' + (cat === currentEmojiCat ? ' active' : '');
+    b.textContent = cat;
+    b.addEventListener('click', () => { currentEmojiCat = cat; renderEmojiPicker(); });
+    catEl.appendChild(b);
+  });
+  gridEl.innerHTML = '';
+  EMOJI_CATS[currentEmojiCat].forEach(e => {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.addEventListener('click', () => {
+      const cur = $('input').value;
+      const start = $('input').selectionStart || cur.length;
+      $('input').value = cur.slice(0, start) + e + cur.slice(start);
+      $('input').focus();
+      autoGrow(); syncSendButton();
+    });
+    gridEl.appendChild(b);
+  });
+}
+$('emojiBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  if ($('emojiPicker').classList.contains('show')) { $('emojiPicker').classList.remove('show'); return; }
+  renderEmojiPicker();
+  $('emojiPicker').classList.add('show');
+});
+document.addEventListener('click', e => {
+  if (!$('emojiPicker').contains(e.target) && e.target !== $('emojiBtn')) $('emojiPicker').classList.remove('show');
+});
+
+$('attachBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async e => {
+  const files = Array.from(e.target.files || []);
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    if (f.size > 5 * 1024 * 1024) { showToast('Too large', 'Max 5MB', 'warning'); continue; }
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    pendingAttachments.push({ name: f.name, dataUrl });
+  }
+  $('fileInput').value = '';
+  renderAttachmentPreview();
+  syncSendButton();
+});
+function renderAttachmentPreview() {
+  const ap = $('attachPreview');
+  ap.innerHTML = '';
+  if (!pendingAttachments.length) { ap.classList.remove('visible'); return; }
+  ap.classList.add('visible');
+  pendingAttachments.forEach((att, i) => {
+    const item = document.createElement('div');
+    item.className = 'attach-item';
+    item.innerHTML = `<img src="${att.dataUrl}"><button class="attach-item__remove">${ICONS.x}</button>`;
+    item.querySelector('.attach-item__remove').addEventListener('click', () => {
+      pendingAttachments.splice(i, 1);
+      renderAttachmentPreview(); syncSendButton();
+    });
+    ap.appendChild(item);
+  });
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null, isListening = false;
+$('micBtn').addEventListener('click', () => {
+  if (!SR) { showToast('Not supported', 'Voice unavailable', 'warning'); return; }
+  if (isListening) { recognition.stop(); return; }
+  if (!recognition) {
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.onresult = e => {
+      let finalT = '', interT = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalT += t; else interT += t;
+      }
+      $('input').value = finalT + interT;
+      autoGrow(); syncSendButton();
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+  }
+  try { recognition.start(); setListening(true); } catch(e){}
+});
+function setListening(on) {
+  isListening = on;
+  $('composerInner').classList.toggle('listening', on);
+  $('micBtn').classList.toggle('listening', on);
+  $('waveform').classList.toggle('active', on);
+}
+
+let draftTimer = null;
+$('input').addEventListener('input', () => {
+  autoGrow(); syncSendButton(); updateSlashMenu(); updateTokenCounter();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    try { localStorage.setItem('thinkly-draft', $('input').value); } catch(e){}
+  }, 400);
+});
+try {
+  const d = localStorage.getItem('thinkly-draft');
+  if (d) { $('input').value = d; autoGrow(); syncSendButton(); }
+} catch(e){}
+
+$('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !isMobile() && !$('slashMenu').classList.contains('show')) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+$('sendBtn').addEventListener('click', () => handleSend());
+function autoGrow() { $('input').style.height = 'auto'; $('input').style.height = Math.min($('input').scrollHeight, 140) + 'px'; }
+function syncSendButton() { $('sendBtn').disabled = isBusy || ($('input').value.trim().length === 0 && pendingAttachments.length === 0); }
+
+async function bootGreeting() {
+  isBusy = true;
+  const typing = showTyping();
+  await wait(500);
+  typing.remove();
+  const greeting = "Hi! I'm Thinkly.\n\nHow can I help you today?";
+  const { row, bubble } = createMessage('bot', '');
+  $('messages').appendChild(row);
+  bubble.innerHTML = renderMarkdown(greeting);
+  bubble.dataset.rawText = greeting;
+  pushToConversation('bot', greeting);
+  isBusy = false;
+}
+
+async function clearCurrentChat() {
+  const c = getActive(); if (!c) return;
+  if (!confirm('Clear this chat?')) return;
+  c.messages = []; c.title = 'New conversation'; c.updatedAt = Date.now();
+  saveToStorage(); renderSidebar();
+  $('messages').innerHTML = '';
+  bootGreeting();
+  showToast('Cleared', '', 'success');
+}
+
+function shareConversation(c) {
+  if (!c || !c.messages.length) { showToast('Nothing to share', '', 'warning'); return; }
+  try {
+    const payload = { title: c.title || 'Conversation', messages: c.messages.map(m => ({ role: m.role, text: m.text })) };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    const url = `${location.origin}${location.pathname}?share=${encodeURIComponent(encoded)}`;
+    navigator.clipboard.writeText(url).then(() => showToast('Link copied', '', 'success'));
+  } catch(e) { showToast('Failed', e.message, 'error'); }
+}
+
+function renderSettings() {
+  const dd = $('settingsDropdown');
+  dd.innerHTML = '';
+  const addSection = label => {
+    const l = document.createElement('div');
+    l.className = 'settings-label';
+    l.textContent = label;
+    dd.appendChild(l);
+  };
+  const addItem = (icon, label, action, hint) => {
+    const b = document.createElement('button');
+    b.className = 'settings-item';
+    b.innerHTML = `${icon}<span>${label}</span>${hint ? `<span class="kbd-hint">${hint}</span>` : ''}`;
+    b.addEventListener('click', () => { dd.classList.remove('show'); action(); });
+    dd.appendChild(b);
+  };
+  const addToggle = (icon, label, value, action) => {
+    const b = document.createElement('button');
+    b.className = 'settings-item';
+    b.innerHTML = `${icon}<span>${label}</span><span class="sw${value ? ' on' : ''}"></span>`;
+    b.querySelector('.sw').addEventListener('click', e => { e.stopPropagation(); action(); });
+    b.addEventListener('click', () => { action(); });
+    dd.appendChild(b);
+  };
+  const addSep = () => { const s = document.createElement('div'); s.className = 'settings-sep'; dd.appendChild(s); };
+
+  addItem(ICONS.moon, 'Toggle theme', () => {
+    themeIndex = (themeIndex + 1) % THEMES.length;
+    applyTheme(THEMES[themeIndex]);
+    try { localStorage.setItem('thinkly-theme', THEMES[themeIndex]); } catch(e){}
+  });
+  addItem(ICONS.chart, 'Usage stats', () => { renderStats(); $('statsModal').classList.add('show'); }, 'Ctrl+Shift+S');
+  addItem(ICONS.search, 'Global search', () => openGlobalSearch(), 'Ctrl+Shift+F');
+  addItem(ICONS.download, 'Export chat', () => exportConversation(getActive()));
+  addItem(ICONS.backup, 'Backup all (JSON)', exportAllAsJSON);
+  addItem(ICONS.share, 'Share conversation', () => shareConversation(getActive()));
+  addItem(ICONS.camera, 'Screenshot chat', captureScreenshot);
+  addSep();
+  addSection('AI');
+  addItem(ICONS.user, 'Persona: ' + PERSONAS.find(p => p.id === currentPersona).name, () => openPersonaPicker());
+  addItem(ICONS.brain, 'Memory', () => { renderMemory(); $('memoryModal').classList.add('show'); });
+  addItem(ICONS.book, 'Knowledge base', () => { renderKB(); $('kbModal').classList.add('show'); });
+  addSep();
+  addSection('Display');
+  addToggle(ICONS.clock, 'Timestamps', showTimestamps, () => {
+    showTimestamps = !showTimestamps;
+    try { localStorage.setItem('thinkly-timestamps', showTimestamps ? '1' : '0'); } catch(e){}
+    renderSettings();
+    if (getActive()) renderConversation(getActive());
+  });
+  addToggle(ICONS.chart, 'Message stats', showStats, () => {
+    showStats = !showStats;
+    try { localStorage.setItem('thinkly-stats', showStats ? '1' : '0'); } catch(e){}
+    renderSettings();
+    if (getActive()) renderConversation(getActive());
+  });
+  addToggle(ICONS.hash, 'Token counter', showTokenCounter, () => {
+    showTokenCounter = !showTokenCounter;
+    try { localStorage.setItem('thinkly-tokencount', showTokenCounter ? '1' : '0'); } catch(e){}
+    renderSettings();
+    updateTokenCounter();
+  });
+  addToggle(ICONS.moon, 'Auto dark (sunset)', autoTheme, () => {
+    autoTheme = !autoTheme;
+    try { localStorage.setItem('thinkly-autotheme', autoTheme ? '1' : '0'); } catch(e){}
+    renderSettings();
+    if (autoTheme) applyAutoTheme();
+  });
+  addSep();
+  addSection('Accent');
+  const accentDiv = document.createElement('div');
+  accentDiv.className = 'accent-picker';
+  const ACCENTS = [
+    { hex:'#6366f1', rgb:'99,102,241' }, { hex:'#8b5cf6', rgb:'139,92,246' },
+    { hex:'#0ea5e9', rgb:'14,165,233' }, { hex:'#10b981', rgb:'16,185,129' },
+    { hex:'#f97316', rgb:'249,115,22' }, { hex:'#ec4899', rgb:'236,72,153' },
+    { hex:'#ef4444', rgb:'239,68,68' }, { hex:'#14b8a6', rgb:'20,184,166' }
+  ];
+  ACCENTS.forEach(a => {
+    const s = document.createElement('button');
+    s.className = 'accent-swatch' + (a.hex === currentAccent.hex ? ' active' : '');
+    s.dataset.hex = a.hex;
+    s.style.background = a.hex;
+    s.addEventListener('click', () => applyAccent(a));
+    accentDiv.appendChild(s);
+  });
+  dd.appendChild(accentDiv);
+  addSep();
+  addSection('Tools');
+  addItem(ICONS.puzzle, 'Plugins', () => { renderPlugins(); $('pluginsModal').classList.add('show'); });
+  addItem(ICONS.code, 'Custom CSS', () => {
+    $('cssEditorInput').value = localStorage.getItem('thinkly-css') || '';
+    $('cssEditorModal').classList.add('show');
+  });
+  addItem(ICONS.keyboard, 'Shortcuts', () => $('shortcutsModal').classList.add('show'), '?');
+  addItem(ICONS.maximize, 'Zen mode', toggleZen, 'Ctrl+.');
+  addSep();
+  addSection('Account');
+  if (isGuest) {
+    addItem(ICONS.user, 'Sign in to save chats', () => { $('authModal').classList.add('show'); });
+  } else {
+    addItem(ICONS.user, 'Signed in as ' + (currentUser || 'User'), () => {});
+    addItem(ICONS.key, 'Sign out', () => $('logoutBtn').click());
+  }
+}
+function toggleZen() {
+  document.body.classList.toggle('zen-mode');
+  showToast(document.body.classList.contains('zen-mode') ? 'Zen mode on' : 'Zen mode off', '', 'info', 1200);
+}
+
+function openPersonaPicker() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  modal.style.zIndex = '1300';
+  let html = '<div class="modal" style="max-width:400px;"><h2>Choose persona</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+  PERSONAS.forEach(p => {
+    html += `<button class="persona-btn" data-id="${p.id}" style="padding:12px;border:1px solid var(--stroke);border-radius:10px;background:var(--bg);cursor:pointer;text-align:center;${p.id === currentPersona ? 'border-color:var(--brand-1);background:rgba(var(--brand-rgb),.08);' : ''}"><div style="font-size:12.5px;font-weight:600;">${p.name}</div></button>`;
+  });
+  html += '</div><button class="modal-btn secondary" id="personaClose" style="margin-top:12px;">Close</button></div>';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('.persona-btn').forEach(b => {
+    b.addEventListener('click', () => { setPersona(b.dataset.id); modal.remove(); showToast('Persona: ' + b.dataset.id, '', 'success'); });
+  });
+  modal.querySelector('#personaClose').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+function renderPlugins() {
+  const list = $('pluginsList');
+  list.innerHTML = '';
+  PLUGINS.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'plugin-item';
+    item.innerHTML = `<div style="flex:1;"><div class="plugin-item__name">${p.name}</div><div class="plugin-item__desc">${p.desc}</div></div><span class="sw${p.enabled ? ' on' : ''}"></span>`;
+    item.querySelector('.sw').addEventListener('click', () => {
+      p.enabled = !p.enabled;
+      item.querySelector('.sw').classList.toggle('on', p.enabled);
+      if (p.enabled && p.register) p.register();
+      showToast(p.enabled ? 'Plugin enabled' : 'Plugin disabled', p.name, 'info', 1500);
+    });
+    list.appendChild(item);
+  });
+}
+
+$('settingsBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  renderSettings();
+  $('settingsDropdown').classList.toggle('show');
+});
+document.addEventListener('click', e => {
+  if (!$('settingsDropdown').contains(e.target) && e.target !== $('settingsBtn')) $('settingsDropdown').classList.remove('show');
+});
+
+function applyAutoTheme() {
+  if (!autoTheme) return;
+  const h = new Date().getHours();
+  const isDark = h < 6 || h >= 19;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+}
+setInterval(applyAutoTheme, 60000);
+if (autoTheme) applyAutoTheme();
+
+function captureScreenshot() {
+  const c = getActive();
+  if (!c || !c.messages.length) { showToast('Nothing to capture', '', 'warning'); return; }
+  showToast('Screenshot', 'Use your browser screenshot tool for now', 'info', 3000);
+}
+
+const COMMANDS = [
+  { id:'new', label:'New conversation', action:newConversation },
+  { id:'clear', label:'Clear current chat', action:clearCurrentChat },
+  { id:'export', label:'Export chat', action:() => exportConversation(getActive()) },
+  { id:'backup', label:'Backup all JSON', action:exportAllAsJSON },
+  { id:'share', label:'Share conversation', action:() => shareConversation(getActive()) },
+  { id:'stats', label:'Usage stats', action:() => { renderStats(); $('statsModal').classList.add('show'); } },
+  { id:'search', label:'Global search', action:openGlobalSearch },
+  { id:'theme', label:'Toggle theme', action:() => { themeIndex = (themeIndex + 1) % THEMES.length; applyTheme(THEMES[themeIndex]); } },
+  { id:'zen', label:'Zen mode', action:toggleZen },
+  { id:'persona', label:'Change persona', action:openPersonaPicker },
+  { id:'memory', label:'Open memory', action:() => { renderMemory(); $('memoryModal').classList.add('show'); } },
+  { id:'kb', label:'Knowledge base', action:() => { renderKB(); $('kbModal').classList.add('show'); } },
+  { id:'shortcuts', label:'Shortcuts', action:() => $('shortcutsModal').classList.add('show') },
+  { id:'login', label:'Sign in', action:() => $('authModal').classList.add('show') },
+  { id:'logout', label:'Sign out', action:() => $('logoutBtn').click() }
+];
+let cmdSelected = 0, cmdFiltered = [];
+function openCmdPalette() {
+  $('cmdPaletteOverlay').classList.add('show');
+  $('cmdPaletteInput').value = '';
+  renderCmd('');
+  setTimeout(() => $('cmdPaletteInput').focus(), 50);
+}
+function closeCmdPalette() { $('cmdPaletteOverlay').classList.remove('show'); }
+function renderCmd(query) {
+  const q = query.toLowerCase().trim();
+  cmdFiltered = [];
+  const list = $('cmdPaletteList');
+  list.innerHTML = '';
+  const cmds = COMMANDS.filter(c => c.label.toLowerCase().includes(q));
+  if (cmds.length) {
+    const g = document.createElement('div');
+    g.className = 'cmd-palette__group';
+    g.textContent = 'Commands';
+    list.appendChild(g);
+    cmds.forEach(c => {
+      const it = document.createElement('div');
+      it.className = 'cmd-palette__item';
+      it.innerHTML = `<span>${c.label}</span>`;
+      it.addEventListener('click', () => { closeCmdPalette(); c.action(); });
+      list.appendChild(it);
+      cmdFiltered.push({ el: it, action: c.action });
+    });
+  }
+  if (q) {
+    const convs = conversations.filter(c => (c.title || '').toLowerCase().includes(q)).slice(0, 5);
+    if (convs.length) {
+      const g = document.createElement('div');
+      g.className = 'cmd-palette__group';
+      g.textContent = 'Chats';
+      list.appendChild(g);
+      convs.forEach(c => {
+        const it = document.createElement('div');
+        it.className = 'cmd-palette__item';
+        it.innerHTML = `<span>${escapeHTML(c.title || deriveTitle(c))}</span>`;
+        it.addEventListener('click', () => { closeCmdPalette(); switchConversation(c.id); });
+        list.appendChild(it);
+        cmdFiltered.push({ el: it, action: () => switchConversation(c.id) });
+      });
+    }
+  }
+  if (!cmdFiltered.length) list.innerHTML = '<div class="cmd-palette__empty">No results</div>';
+  cmdSelected = 0;
+  updateCmdSel();
+}
+function updateCmdSel() { cmdFiltered.forEach((it, i) => it.el.classList.toggle('selected', i === cmdSelected)); }
+$('cmdPaletteInput').addEventListener('input', e => renderCmd(e.target.value));
+$('cmdPaletteInput').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); cmdSelected = Math.min(cmdSelected + 1, cmdFiltered.length - 1); updateCmdSel(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); cmdSelected = Math.max(cmdSelected - 1, 0); updateCmdSel(); }
+  else if (e.key === 'Enter') { e.preventDefault(); cmdFiltered[cmdSelected]?.action(); closeCmdPalette(); }
+  else if (e.key === 'Escape') closeCmdPalette();
+});
+$('cmdPaletteOverlay').addEventListener('click', e => { if (e.target === $('cmdPaletteOverlay')) closeCmdPalette(); });
+
+function updateNet() {
+  const el = $('netStatus');
+  if (navigator.onLine) {
+    el.classList.add('show','online');
+    $('netStatusText').textContent = 'Online';
+    setTimeout(() => el.classList.remove('show'), 2000);
+  } else {
+    el.classList.add('show','offline');
+    $('netStatusText').textContent = 'Offline';
+  }
+}
+window.addEventListener('online', updateNet);
+window.addEventListener('offline', updateNet);
+
+let isRegisterMode = false;
+
+function showAuthModal() {
+  if (currentUser && !isGuest) return;
+  $('authModal').classList.add('show');
+  $('auroraBg').classList.add('visible');
+  if (typeof resetAuthPasswordVisibility === 'function') resetAuthPasswordVisibility();
+}
+function hideAuthModal() {
+  $('authModal').classList.remove('show');
+  $('auroraBg').classList.remove('visible');
+}
+
+$('authSwitchLink').addEventListener('click', () => {
+  isRegisterMode = !isRegisterMode;
+  $('authTitle').textContent = isRegisterMode ? 'Create Account' : 'Welcome Back';
+  $('authSubtitle').textContent = isRegisterMode ? 'Sign up to start chatting' : 'Sign in to access your chats';
+  $('authSubmitBtn').textContent = isRegisterMode ? 'Sign Up' : 'Sign In';
+  $('authSwitchText').textContent = isRegisterMode ? 'Already have an account?' : "Don't have an account?";
+  $('authSwitchLink').textContent = isRegisterMode ? 'Sign In' : 'Sign Up';
+  $('authError').textContent = '';
+});
+
+$('authSubmitBtn').addEventListener('click', async () => {
+  const u = $('authUsername').value.trim();
+  const p = $('authPassword').value.trim();
+  if (!u || !p) { $('authError').textContent = 'Fill in all fields'; return; }
+  if (isRegisterMode && p.length < 8) { $('authError').textContent = 'Password must be at least 8 characters'; return; }
+  $('authSubmitBtn').disabled = true;
+  $('authSubmitBtn').textContent = 'Please wait...';
+  $('authError').textContent = '';
+  try {
+    const res = await fetch(isRegisterMode ? '/api/register' : '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { $('authError').textContent = data.error || 'Authentication failed'; return; }
+    currentUser = data.username || u;
+    isGuest = false;
+    try { localStorage.setItem('thinkly-lastmode', 'user'); } catch(e){}
+    $('userNameDisplay').textContent = currentUser;
+    $('userStatusDisplay').textContent = 'Online';
+    $('userProfile').style.display = 'flex';
+    updateModeBadge();
+    hideAuthModal();
+    loadFromStorage();
+    ensureActive();
+    renderSidebar();
+    if (getActive()) renderConversation(getActive());
+    showToast('Welcome back!', currentUser, 'success');
+  } catch(e) {
+    $('authError').textContent = 'Connection error. Try guest mode.';
+  } finally {
+    $('authSubmitBtn').disabled = false;
+    $('authSubmitBtn').textContent = isRegisterMode ? 'Sign Up' : 'Sign In';
+  }
+});
+
+$('authForgotLink').addEventListener('click', () => {
+  $('forgotUsername').value = $('authUsername').value.trim();
+  $('forgotError').textContent = '';
+  $('forgotSuccess').textContent = '';
+  $('authModal').classList.remove('show');
+  $('forgotModal').classList.add('show');
+});
+
+$('forgotSubmitBtn').addEventListener('click', async () => {
+  const u = $('forgotUsername').value.trim();
+  if (!u) { $('forgotError').textContent = 'Enter your username or email'; return; }
+  $('forgotError').textContent = '';
+  $('forgotSuccess').textContent = '';
+  $('forgotSubmitBtn').disabled = true;
+  $('forgotSubmitBtn').textContent = 'Sending...';
+  try {
+    const res = await fetch('/api/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      $('forgotSuccess').textContent = 'If an account exists, a reset link has been sent.';
+      return;
+    }
+    $('forgotSuccess').textContent = data.message || 'Check your inbox for a reset link.';
+
+    const existingBox = document.getElementById('devResetLinkBox');
+    if (existingBox) existingBox.remove();
+    if (data.dev_reset_link) {
+      const box = document.createElement('div');
+      box.id = 'devResetLinkBox';
+      box.style.cssText = 'margin-top:8px;padding:10px 12px;background:rgba(99,102,241,.08);border:1px dashed rgba(99,102,241,.5);border-radius:10px;font-size:12px;text-align:center;';
+
+      const label = document.createElement('div');
+      label.style.cssText = 'font-weight:600;color:var(--brand-1);margin-bottom:6px;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;';
+      label.textContent = 'Dev mode — Click to reset:';
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Reset my password now';
+      btn.style.cssText = 'padding:8px 14px;background:var(--brand-1);color:#fff;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;';
+      btn.addEventListener('click', () => {
+        const t = new URL(data.dev_reset_link, location.origin).searchParams.get('reset_token');
+        if (t) {
+          window.__resetToken = t;
+          $('forgotModal').classList.remove('show');
+          $('resetModal').classList.add('show');
+        }
+      });
+
+      box.appendChild(label);
+      box.appendChild(btn);
+      $('forgotSuccess').parentNode.insertBefore(box, $('forgotSuccess').nextSibling);
+    }
+  } catch(e) {
+    $('forgotSuccess').textContent = 'If an account exists, a reset link has been sent.';
+  } finally {
+    $('forgotSubmitBtn').disabled = false;
+    $('forgotSubmitBtn').textContent = 'Send reset link';
+  }
+});
+
+$('forgotBackBtn').addEventListener('click', () => {
+  $('forgotModal').classList.remove('show');
+  $('authModal').classList.add('show');
+});
+
+$('resetSubmitBtn').addEventListener('click', async () => {
+  const p1 = $('resetPassword').value;
+  const p2 = $('resetPassword2').value;
+  if (!p1 || !p2) { $('resetError').textContent = 'Fill in both fields'; return; }
+  if (p1.length < 8) { $('resetError').textContent = 'Password must be at least 8 characters'; return; }
+  if (p1 !== p2) { $('resetError').textContent = 'Passwords do not match'; return; }
+
+  $('resetError').textContent = '';
+  $('resetSuccess').textContent = '';
+  $('resetSubmitBtn').disabled = true;
+  $('resetSubmitBtn').textContent = 'Updating...';
+
+  const token = window.__resetToken
+    || new URLSearchParams(location.search).get('reset_token')
+    || new URLSearchParams(location.search).get('token')
+    || '';
+
+  if (!token) {
+    $('resetError').textContent = 'Missing reset token. Please request a new link.';
+    $('resetSubmitBtn').disabled = false;
+    $('resetSubmitBtn').textContent = 'Update password';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: p1 })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      $('resetError').textContent = data.error || 'Reset failed';
+      return;
+    }
+
+    $('resetSuccess').textContent = 'Password updated! Redirecting to sign in…';
+
+    window.__resetToken = null;
+    history.replaceState({}, '', '/');
+
+    const lastUser = $('forgotUsername').value.trim() || $('authUsername').value.trim();
+    if (lastUser) $('authUsername').value = lastUser;
+    if (data.username) $('authUsername').value = data.username;
+
+    setTimeout(() => {
+      $('resetModal').classList.remove('show');
+      $('resetPassword').value = '';
+      $('resetPassword2').value = '';
+      $('resetSuccess').textContent = '';
+      $('resetError').textContent = '';
+      const existingBox = document.getElementById('devResetLinkBox');
+      if (existingBox) existingBox.remove();
+
+      $('authModal').classList.add('show');
+      $('auroraBg').classList.add('visible');
+
+      isRegisterMode = false;
+      $('authTitle').textContent = 'Welcome Back';
+      $('authSubtitle').textContent = 'Sign in with your new password';
+      $('authSubmitBtn').textContent = 'Sign In';
+      $('authSwitchText').textContent = "Don't have an account?";
+      $('authSwitchLink').textContent = 'Sign Up';
+
+      $('authPassword').value = '';
+      $('authError').textContent = '';
+
+      setTimeout(() => $('authPassword').focus(), 250);
+
+      showToast('Password updated', 'Sign in with your new password', 'success', 4000);
+    }, 1500);
+
+  } catch(e) {
+    $('resetError').textContent = 'Connection error';
+  } finally {
+    $('resetSubmitBtn').disabled = false;
+    $('resetSubmitBtn').textContent = 'Update password';
+  }
+});
+
+$('resetBackBtn').addEventListener('click', () => {
+  window.__resetToken = null;
+  history.replaceState({}, '', '/');
+  $('resetModal').classList.remove('show');
+  $('authModal').classList.add('show');
+});
+
+$('guestBtn').addEventListener('click', async () => {
+  const btn = $('guestBtn');
+  if (btn.disabled) return;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Starting guest session…';
+
+  try {
+    const res = await fetch('/api/guest-login', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      showToast('Guest mode failed', data.error || 'Please try again later', 'error');
+      return;
+    }
+
+    currentUser = data.username || 'Guest';
+    isGuest = true;
+    try { localStorage.setItem('thinkly-lastmode', 'guest'); } catch(e){}
+
+    $('userNameDisplay').textContent = 'Guest';
+    $('userStatusDisplay').textContent = 'Local only';
+    $('userProfile').style.display = 'flex';
+    updateModeBadge();
+    hideAuthModal();
+    loadFromStorage();
+    ensureActive();
+    renderSidebar();
+    if (getActive()) renderConversation(getActive());
+    showToast('Guest mode', 'Chats saved to your guest account', 'info', 4000);
+  } catch (e) {
+    showToast('Connection error', 'Could not start guest session', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+function updateModeBadge() {
+  const badge = $('modeBadge');
+  const status = $('headerStatus');
+  if (isGuest) {
+    badge.textContent = 'Guest';
+    badge.classList.add('badge--guest');
+    status.textContent = 'Local only';
+  } else {
+    badge.textContent = 'Pro';
+    badge.classList.remove('badge--guest');
+    status.textContent = 'Online';
+  }
+}
+
+$('logoutBtn').addEventListener('click', async () => {
+  const msg = isGuest
+    ? 'Sign out of guest mode?'
+    : 'Sign out? Account chats are saved to your account.';
+  if (!confirm(msg)) return;
+  try { await fetch('/api/logout', { method: 'POST' }); } catch(e){}
+  currentUser = null;
+  isGuest = false;
+  try { localStorage.removeItem('thinkly-lastmode'); } catch(e){}
+  $('userProfile').style.display = 'none';
+  conversations = [];
+  $('messages').innerHTML = '';
+  renderSidebar();
+  showAuthModal();
+});
+
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/me');
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.username;
+      isGuest = !!data.guest;
+
+      $('userNameDisplay').textContent = isGuest ? 'Guest' : currentUser;
+      $('userStatusDisplay').textContent = isGuest ? 'Local only' : 'Online';
+      $('userProfile').style.display = 'flex';
+      updateModeBadge();
+      return true;
+    }
+  } catch(e){}
+  return false;
+}
+
+function openSidebar() {
+  if (isMobile()) {
+    $('sidebar').classList.remove('collapsed');
+    $('sidebarOverlay').classList.add('show');
+  } else {
+    $('appShell').classList.remove('is-collapsed');
+    $('sidebar').classList.remove('collapsed');
+  }
+}
+function closeSidebar() {
+  if (isMobile()) {
+    $('sidebar').classList.add('collapsed');
+    $('sidebarOverlay').classList.remove('show');
+  } else {
+    $('appShell').classList.add('is-collapsed');
+    $('sidebar').classList.add('collapsed');
+  }
+}
+function toggleSidebar() {
+  if (isMobile()) {
+    const isCollapsed = $('sidebar').classList.contains('collapsed');
+    if (isCollapsed) openSidebar(); else closeSidebar();
+  } else {
+    const isCollapsed = $('appShell').classList.contains('is-collapsed');
+    if (isCollapsed) openSidebar(); else closeSidebar();
+  }
+}
+$('sidebarToggleBtn').addEventListener('click', toggleSidebar);
+$('sidebarCloseBtn').addEventListener('click', closeSidebar);
+$('sidebarOverlay').addEventListener('click', closeSidebar);
+$('newChatBtn').addEventListener('click', newConversation);
+
+function syncSidebar() {
+  if (isMobile()) {
+    $('sidebar').classList.add('collapsed');
+    $('sidebarOverlay').classList.remove('show');
+    $('appShell').classList.remove('is-collapsed');
+  } else {
+    $('sidebar').classList.remove('collapsed');
+    $('sidebarOverlay').classList.remove('show');
+    $('appShell').classList.remove('is-collapsed');
+  }
+}
+syncSidebar();
+window.addEventListener('resize', syncSidebar);
+
+$('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  $('searchClear').classList.toggle('visible', searchQuery.length > 0);
+  renderSidebar();
+});
+$('searchClear').addEventListener('click', () => {
+  $('searchInput').value = ''; searchQuery = '';
+  $('searchClear').classList.remove('visible');
+  renderSidebar();
+});
+
+['statsModal','globalSearchModal','cssEditorModal','pluginsModal','memoryModal','kbModal','shortcutsModal','forgotModal','resetModal'].forEach(id => {
+  $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.remove('show'); });
+});
+$('statsClose').onclick = () => $('statsModal').classList.remove('show');
+$('globalSearchClose').onclick = () => $('globalSearchModal').classList.remove('show');
+$('globalSearchInput').addEventListener('input', e => renderGlobalSearch(e.target.value));
+$('cssClose').onclick = () => $('cssEditorModal').classList.remove('show');
+$('cssSave').onclick = () => {
+  const css = $('cssEditorInput').value;
+  try { localStorage.setItem('thinkly-css', css); } catch(e){}
+  let styleEl = $('customCSS');
+  if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = 'customCSS'; document.head.appendChild(styleEl); }
+  styleEl.textContent = css;
+  showToast('CSS applied', '', 'success');
+  $('cssEditorModal').classList.remove('show');
+};
+$('cssReset').onclick = () => {
+  try { localStorage.removeItem('thinkly-css'); } catch(e){}
+  const styleEl = $('customCSS'); if (styleEl) styleEl.textContent = '';
+  $('cssEditorInput').value = '';
+  showToast('CSS cleared', '', 'info');
+};
+$('pluginsClose').onclick = () => $('pluginsModal').classList.remove('show');
+$('memoryClose').onclick = () => $('memoryModal').classList.remove('show');
+$('kbClose').onclick = () => $('kbModal').classList.remove('show');
+$('shortcutsClose').onclick = () => $('shortcutsModal').classList.remove('show');
+
+try {
+  const css = localStorage.getItem('thinkly-css');
+  if (css) {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'customCSS';
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+  }
+} catch(e){}
+
+$('findBtn').addEventListener('click', openMsgSearch);
+$('msgSearchInput').addEventListener('input', e => performMsgSearch(e.target.value));
+$('msgSearchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? $('msgSearchPrev').click() : $('msgSearchNext').click(); }
+  else if (e.key === 'Escape') closeMsgSearch();
+});
+$('msgSearchNext').addEventListener('click', () => {
+  if (!msgSearchHits.length) return;
+  msgSearchCurrent = (msgSearchCurrent + 1) % msgSearchHits.length;
+  updateMsgSearchActive();
+  $('msgSearchCount').textContent = `${msgSearchCurrent+1} / ${msgSearchHits.length}`;
+});
+$('msgSearchPrev').addEventListener('click', () => {
+  if (!msgSearchHits.length) return;
+  msgSearchCurrent = (msgSearchCurrent - 1 + msgSearchHits.length) % msgSearchHits.length;
+  updateMsgSearchActive();
+  $('msgSearchCount').textContent = `${msgSearchCurrent+1} / ${msgSearchHits.length}`;
+});
+$('msgSearchClose').addEventListener('click', closeMsgSearch);
+
+document.addEventListener('keydown', e => {
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const inField = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
+
+  if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); $('cmdPaletteOverlay').classList.contains('show') ? closeCmdPalette() : openCmdPalette(); return; }
+  if (mod && e.key.toLowerCase() === 'f' && !e.shiftKey) { e.preventDefault(); openMsgSearch(); return; }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); openGlobalSearch(); return; }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); renderStats(); $('statsModal').classList.add('show'); return; }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); newConversation(); return; }
+  if (mod && e.key === '.') { e.preventDefault(); toggleZen(); return; }
+  if (e.key === 'Escape') {
+    ['statsModal','globalSearchModal','cssEditorModal','pluginsModal','memoryModal','kbModal','shortcutsModal','forgotModal','resetModal'].forEach(id => $(id).classList.remove('show'));
+    closeCmdPalette();
+    closeMsgSearch();
+    $('settingsDropdown').classList.remove('show');
+    $('emojiPicker').classList.remove('show');
+    $('slashMenu').classList.remove('show');
+    if (isMobile() && !$('sidebar').classList.contains('collapsed')) closeSidebar();
+  }
+  if (e.key === '?' && !inField) { e.preventDefault(); $('shortcutsModal').classList.add('show'); }
+  if (e.key === 'ArrowUp' && document.activeElement === $('input') && !$('input').value && !isBusy) {
+    const c = getActive();
+    if (c) for (let i = c.messages.length - 1; i >= 0; i--) {
+      if (c.messages[i].role === 'user') { e.preventDefault(); editUserMessage(i); break; }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT — handles reset_token FIRST (opens modal immediately)
+// ═══════════════════════════════════════════════════════════════
+async function boot() {
+  const params = new URLSearchParams(location.search);
+  const resetTokenFromUrl = params.get('reset_token');
+
+  // 1) PASSWORD RESET — Show modal IMMEDIATELY
+  if (resetTokenFromUrl) {
+    console.log('[Thinkly boot] Reset token found, opening Reset Password modal');
+    window.__resetToken = resetTokenFromUrl;
+
+    // Hide all other modals first
+    document.querySelectorAll('.modal-overlay.show').forEach(el => el.classList.remove('show'));
+
+    $('resetModal').classList.add('show');
+    $('auroraBg').classList.add('visible');
+    $('resetError').textContent = '';
+    $('resetSuccess').textContent = '';
+    $('resetPassword').value = '';
+    $('resetPassword2').value = '';
+
+    try { history.replaceState({}, '', '/'); } catch(e) {}
+
+    try {
+      currentUser = GUEST_KEY;
+      isGuest = true;
+      loadFromStorage();
+      ensureActive();
+      renderSidebar();
+      if (getActive()) renderConversation(getActive());
+    } catch(e) { console.error('[Thinkly boot] Background prep failed:', e); }
+
+    setTimeout(() => $('resetPassword').focus(), 400);
+    setTimeout(updateNet, 500);
+    return;
+  }
+
+  // 2) SHARED CONVERSATION
+  const share = params.get('share');
+  if (share) {
+    try {
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(share))));
+      if (decoded?.messages) {
+        history.replaceState({}, '', '/');
+        setTimeout(() => {
+          hideAuthModal();
+          $('messages').innerHTML = '';
+          const banner = document.createElement('div');
+          banner.style.cssText = 'padding:12px;background:rgba(var(--brand-rgb),.08);border:1px solid rgba(var(--brand-rgb),.2);border-radius:12px;text-align:center;color:var(--brand-1);font-weight:600;';
+          banner.textContent = 'Shared conversation - view only';
+          $('messages').appendChild(banner);
+          decoded.messages.forEach((m, i) => {
+            const { row } = createMessage(m.role, m.text, i);
+            $('messages').appendChild(row);
+          });
+          $('input').disabled = true; $('sendBtn').disabled = true;
+          $('input').placeholder = 'Read-only view';
+        }, 100);
+        return;
+      }
+    } catch(e) { history.replaceState({}, '', '/'); }
+  }
+
+  // 3) NORMAL AUTH
+  const authed = await checkAuth();
+  if (authed) {
+    try { localStorage.setItem('thinkly-lastmode', isGuest ? 'guest' : 'user'); } catch(e){}
+    loadFromStorage();
+    ensureActive();
+    renderSidebar();
+    if (getActive()) renderConversation(getActive());
+  } else {
+    showAuthModal();
+    currentUser = GUEST_KEY;
+    isGuest = true;
+    updateModeBadge();
+    loadFromStorage();
+    ensureActive();
+    renderSidebar();
+    if (getActive()) renderConversation(getActive());
+  }
+  setTimeout(updateNet, 500);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
