@@ -1219,8 +1219,12 @@ body.zen-mode .chat{grid-column:1}
 <script>
 (() => {
 'use strict';
+
+// ⚠️ IMPORTANT: Replace this with your actual Render backend URL ⚠️
+const BACKEND_URL = 'https://your-render-backend-url.onrender.com'; 
+
 const $ = id => document.getElementById(id);
-const API_ENDPOINT = '/api/chat';
+const API_ENDPOINT = `${BACKEND_URL}/api/chat`;
 const GUEST_KEY = '__guest__';
 
 let currentUser = null;
@@ -1807,7 +1811,8 @@ async function streamMarkdownInto(el, lastUserText, attachments = []) {
         persona: getPersona(),
         images: attachments.map(a => a.dataUrl)
       }),
-      signal
+      signal,
+      credentials: 'include' // Important for cross-origin cookies
     }).then(async res => {
       if (res.status === 401) { setError('Session expired.'); showAuthModal(); return; }
       if (!res.ok) { setError('HTTP ' + res.status); return; }
@@ -3037,7 +3042,7 @@ window.addEventListener('offline', updateNet);
 let isRegisterMode = false;
 
 function showAuthModal() {
-  if (currentUser && !isGuest) return;
+  // Force the modal to show, regardless of current user state
   $('authModal').classList.add('show');
   $('auroraBg').classList.add('visible');
   if (typeof resetAuthPasswordVisibility === 'function') resetAuthPasswordVisibility();
@@ -3066,10 +3071,11 @@ $('authSubmitBtn').addEventListener('click', async () => {
   $('authSubmitBtn').textContent = 'Please wait...';
   $('authError').textContent = '';
   try {
-    const res = await fetch(isRegisterMode ? '/api/register' : '/api/login', {
+    const res = await fetch(`${BACKEND_URL}${isRegisterMode ? '/api/register' : '/api/login'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p })
+      body: JSON.stringify({ username: u, password: p }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { $('authError').textContent = data.error || 'Authentication failed'; return; }
@@ -3110,10 +3116,11 @@ $('forgotSubmitBtn').addEventListener('click', async () => {
   $('forgotSubmitBtn').disabled = true;
   $('forgotSubmitBtn').textContent = 'Sending...';
   try {
-    const res = await fetch('/api/forgot-password', {
+    const res = await fetch(`${BACKEND_URL}/api/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u })
+      body: JSON.stringify({ username: u }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -3187,10 +3194,11 @@ $('resetSubmitBtn').addEventListener('click', async () => {
   }
 
   try {
-    const res = await fetch('/api/reset-password', {
+    const res = await fetch(`${BACKEND_URL}/api/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: p1 })
+      body: JSON.stringify({ token, password: p1 }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -3257,7 +3265,10 @@ $('guestBtn').addEventListener('click', async () => {
   btn.textContent = 'Starting guest session…';
 
   try {
-    const res = await fetch('/api/guest-login', { method: 'POST' });
+    const res = await fetch(`${BACKEND_URL}/api/guest-login`, { 
+      method: 'POST',
+      credentials: 'include'
+    });
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -3306,7 +3317,7 @@ $('logoutBtn').addEventListener('click', async () => {
     ? 'Sign out of guest mode?'
     : 'Sign out? Account chats are saved to your account.';
   if (!confirm(msg)) return;
-  try { await fetch('/api/logout', { method: 'POST' }); } catch(e){}
+  try { await fetch(`${BACKEND_URL}/api/logout`, { method: 'POST', credentials: 'include' }); } catch(e){}
   currentUser = null;
   isGuest = false;
   try { localStorage.removeItem('thinkly-lastmode'); } catch(e){}
@@ -3319,7 +3330,9 @@ $('logoutBtn').addEventListener('click', async () => {
 
 async function checkAuth() {
   try {
-    const res = await fetch('/api/me');
+    const res = await fetch(`${BACKEND_URL}/api/me`, {
+      credentials: 'include'
+    });
     if (res.ok) {
       const data = await res.json();
       currentUser = data.username;
@@ -3331,7 +3344,7 @@ async function checkAuth() {
       updateModeBadge();
       return true;
     }
-  } catch(e){}
+  } catch(e){ console.error('Auth check failed:', e); }
   return false;
 }
 
