@@ -2,28 +2,34 @@ import os
 import json
 import uuid
 import time
+import requests
 from flask import Flask, request, jsonify, render_template, session, Response, stream_with_context
 from flask_cors import CORS
-import requests # Ensure you have this installed for API calls
 
-# --- SETUP FOLDERS ---
+# ==========================================
+# 1. SETUP & CONFIGURATION
+# ==========================================
+
+# Get the absolute path to the backend folder
 base_dir = os.path.dirname(os.path.abspath(__file__))
 # Point to the 'public' folder located one level up (../public)
 template_dir = os.path.join(base_dir, '..', 'public')
 
-# --- INIT APP ---
+# Initialize Flask App
 app = Flask(__name__, template_folder=template_dir, static_folder=template_dir)
 app.secret_key = 'your-super-secret-key-change-this-in-production'
 
-# --- CORS CONFIGURATION ---
-# This allows your Netlify frontend to talk to this backend, and allows cookies to be sent
+# CORS Configuration (Crucial for Netlify -> PythonAnywhere communication)
 CORS(app, supports_credentials=True, origins=[
     "https://thinkly5.netlify.app",
     "http://localhost:5001",
     "http://127.0.0.1:5001"
 ])
 
-# --- DATABASE HELPERS (JSON based for simplicity) ---
+# ==========================================
+# 2. DATABASE HELPERS (JSON based)
+# ==========================================
+
 USERS_FILE = os.path.join(base_dir, 'users.json')
 RESETS_FILE = os.path.join(base_dir, 'resets.json')
 
@@ -37,7 +43,9 @@ def save_json(filepath, data):
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=4)
 
-# --- ROUTES ---
+# ==========================================
+# 3. AUTHENTICATION ROUTES
+# ==========================================
 
 @app.route('/')
 def index():
@@ -98,6 +106,10 @@ def logout():
     session.clear()
     return jsonify({'message': 'Logged out'}), 200
 
+# ==========================================
+# 4. PASSWORD RESET ROUTES
+# ==========================================
+
 @app.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.json
@@ -113,10 +125,10 @@ def forgot_password():
     resets[token] = {'username': username, 'timestamp': time.time()}
     save_json(RESETS_FILE, resets)
     
-    # FOR PRODUCTION: Change localhost to your Netlify URL
+    # In production, you would email this link. 
+    # For now, we return it so you can test easily.
     reset_link = f"https://thinkly5.netlify.app/?reset_token={token}"
     
-    # Return the link in dev mode so you can test easily
     return jsonify({
         'message': 'Reset link generated.',
         'dev_reset_link': reset_link
@@ -145,27 +157,82 @@ def reset_password():
     
     return jsonify({'message': 'Password updated successfully', 'username': username}), 200
 
+# ==========================================
+# 5. AI CHAT ROUTE (GROQ INTEGRATION)
+# ==========================================
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
         data = request.json
         user_message = data.get('message', '')
+        persona = data.get('persona', 'You are a helpful, friendly AI assistant.')
         
+        # Get the API key from environment variables
+        api_key = os.environ.get("GROQ_API_KEY")        
+        if not api_key:
+            return jsonify({'error': 'GROQ_API_KEY is not configured. Please set it in your environment variables.'}), 500
+
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # UPDATED: Using a currently supported Groq model
+        payload = {
+            "model": "openai/gpt-oss-120b",
+            "messages": [
+                {"role": "system", "content": persona},
+                {"role": "user", "content": user_message}
+            ],
+            "stream": True,
+            "temperature": 0.7,
+        }
+
         def generate():
-            # Mock response streaming
-            response_text = f"I am a mock AI. You said: '{user_message}'. To make this real, connect your OpenAI/Groq API in app.py."
-            words = response_text.split(' ')
-            for word in words:
-                yield f"data: {json.dumps({'delta': word + ' '})}\n\n"
-                time.sleep(0.05)
-            
-            yield "data: [DONE]\n\n"
-            
+            try:
+                with requests.post(url, headers=headers, json=payload, stream=True, timeout=60) as resp:
+                    resp.raise_for_status() # Raise exception for 400/500 errors
+                    
+                    for line in resp.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith(b"data: "):
+                            chunk_data = line[6:]
+                            if chunk_data == b"[DONE]":
+                                yield "data: [DONE]\n\n"
+                                break
+                            try:
+                                chunk = json.loads(chunk_data)
+                                delta = chunk["choices"][0]["delta"]
+                                if "content" in delta and delta["content"]:
+                                    # Frontend expects: data: {"delta": "text"}
+                                    yield f"data: {json.dumps({'delta': delta['content']})}\n\n"
+                            except (json.JSONDecodeError, KeyError, IndexError):
+                                continue
+                                
+            except requests.exceptions.HTTPError as e:
+                # THIS IS THE KEY DEBUGGING LINE
+                print(f"GROQ API HTTP ERROR: {e}")
+                print(f"RESPONSE BODY: {e.response.text}") 
+                yield f"data: {json.dumps({'delta': f' API Error: {e.response.text}'})}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                print(f"STREAM ERROR: {e}")
+                yield f"data: {json.dumps({'delta': ' Sorry, an error occurred while connecting to the AI.'})}\n\n"
+                yield "data: [DONE]\n\n"
+
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
+        
     except Exception as e:
-        print(f"CHAT ERROR: {e}") # This will show in your terminal
+        print(f"CHAT ERROR: {e}")
         return jsonify({'error': str(e)}), 500
+
+# ==========================================
+# 6. RUN THE APP
+# ==========================================
 
 if __name__ == '__main__':
     # Run on port 5001 locally
-    app.run(host='0.0.0.0', port=5001, debug=True)  
+    app.run(host='0.0.0.0', port=5001, debug=True)
