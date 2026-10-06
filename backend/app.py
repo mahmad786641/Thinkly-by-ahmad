@@ -20,6 +20,10 @@ template_dir = os.path.join(base_dir, '..', 'public')
 app = Flask(__name__, template_folder=template_dir, static_folder=template_dir)
 app.secret_key = 'your-super-secret-key-change-this-in-production'
 
+# ✅ Fix for mobile browsers blocking cross-site cookies
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 # CORS Configuration (Crucial for Netlify -> Render communication)
 CORS(app, supports_credentials=True, origins=[
     "https://thinkly5.netlify.app",
