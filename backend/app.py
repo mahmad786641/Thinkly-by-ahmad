@@ -3,6 +3,7 @@ import json
 import uuid
 import time
 import requests
+import resend  # NEW: For sending emails via HTTP API
 from flask import Flask, request, jsonify, render_template, session, Response, stream_with_context
 from flask_cors import CORS
 
@@ -19,7 +20,7 @@ template_dir = os.path.join(base_dir, '..', 'public')
 app = Flask(__name__, template_folder=template_dir, static_folder=template_dir)
 app.secret_key = 'your-super-secret-key-change-this-in-production'
 
-# CORS Configuration (Crucial for Netlify -> PythonAnywhere communication)
+# CORS Configuration (Crucial for Netlify -> Render communication)
 CORS(app, supports_credentials=True, origins=[
     "https://thinkly5.netlify.app",
     "http://localhost:5001",
@@ -34,10 +35,11 @@ USERS_FILE = os.path.join(base_dir, 'users.json')
 RESETS_FILE = os.path.join(base_dir, 'resets.json')
 
 def load_json(filepath):
+    """Robust JSON loader that handles empty files (caused by Render's ephemeral storage)"""
     if os.path.exists(filepath):
         with open(filepath, 'r') as f:
             content = f.read().strip()
-            if not content:  # If the file is empty, return an empty dict
+            if not content:  # If file is empty, return empty dict
                 return {}
             try:
                 return json.loads(content)
@@ -46,6 +48,7 @@ def load_json(filepath):
     return {}
 
 def save_json(filepath, data):
+    """Saves data to a JSON file"""
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=4)
 
@@ -55,7 +58,6 @@ def save_json(filepath, data):
 
 @app.route('/')
 def index():
-    # Serve the main index.html from the public folder
     return render_template('index.html')
 
 @app.route('/api/me', methods=['GET'])
@@ -113,13 +115,13 @@ def logout():
     return jsonify({'message': 'Logged out'}), 200
 
 # ==========================================
-# 4. PASSWORD RESET ROUTES
+# 4. PASSWORD RESET ROUTES (UPDATED WITH RESEND)
 # ==========================================
 
 @app.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.json
-    username = data.get('username')
+    username = data.get('username') # Assuming username is the email address
     
     users = load_json(USERS_FILE)
     if username not in users:
@@ -131,14 +133,30 @@ def forgot_password():
     resets[token] = {'username': username, 'timestamp': time.time()}
     save_json(RESETS_FILE, resets)
     
-    # In production, you would email this link. 
-    # For now, we return it so you can test easily.
+    # Build the reset link pointing to your Netlify frontend
     reset_link = f"https://thinkly5.netlify.app/?reset_token={token}"
     
-    return jsonify({
-        'message': 'Reset link generated.',
-        'dev_reset_link': reset_link
-    }), 200
+    # --- Send email using Resend (HTTP API, bypasses Render SMTP block) ---
+    try:
+        resend.api_key = os.environ.get('RESEND_API_KEY')
+        if not resend.api_key:
+            raise ValueError("RESEND_API_KEY is not set in environment variables.")
+            
+        resend.Emails.send({
+            "from": "onboarding@resend.dev", # Use this test address until you verify a domain
+            "to": username, # Send to the user's email (username)
+            "subject": "Reset your Thinkly password",
+            "html": f"<p>Click the link below to reset your password:</p><p><a href='{reset_link}'>Reset Password</a></p><p>If you didn't request this, please ignore this email.</p>"
+        })
+        return jsonify({'message': 'Reset link has been sent to your email.'}), 200
+        
+    except Exception as e:
+        print(f"Email sending failed: {e}")
+        # Fallback: return the link in dev mode if sending fails
+        return jsonify({
+            'message': 'Email sending failed, but here is your reset link.',
+            'dev_reset_link': reset_link
+        }), 200
 
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
@@ -174,10 +192,9 @@ def chat():
         user_message = data.get('message', '')
         persona = data.get('persona', 'You are a helpful, friendly AI assistant.')
         
-        # Get the API key from environment variables
-        api_key = os.environ.get("GROQ_API_KEY")        
+        api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
-            return jsonify({'error': 'GROQ_API_KEY is not configured. Please set it in your environment variables.'}), 500
+            return jsonify({'error': 'GROQ_API_KEY is not configured. Please set it in Render Environment Variables.'}), 500
 
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -185,9 +202,8 @@ def chat():
             "Content-Type": "application/json"
         }
         
-        # UPDATED: Using a currently supported Groq model
         payload = {
-            "model": "openai/gpt-oss-120b",
+            "model": "openai/gpt-oss-120b", # The working model
             "messages": [
                 {"role": "system", "content": persona},
                 {"role": "user", "content": user_message}
@@ -199,8 +215,7 @@ def chat():
         def generate():
             try:
                 with requests.post(url, headers=headers, json=payload, stream=True, timeout=60) as resp:
-                    resp.raise_for_status() # Raise exception for 400/500 errors
-                    
+                    resp.raise_for_status()
                     for line in resp.iter_lines():
                         if not line:
                             continue
@@ -213,17 +228,9 @@ def chat():
                                 chunk = json.loads(chunk_data)
                                 delta = chunk["choices"][0]["delta"]
                                 if "content" in delta and delta["content"]:
-                                    # Frontend expects: data: {"delta": "text"}
                                     yield f"data: {json.dumps({'delta': delta['content']})}\n\n"
                             except (json.JSONDecodeError, KeyError, IndexError):
                                 continue
-                                
-            except requests.exceptions.HTTPError as e:
-                # THIS IS THE KEY DEBUGGING LINE
-                print(f"GROQ API HTTP ERROR: {e}")
-                print(f"RESPONSE BODY: {e.response.text}") 
-                yield f"data: {json.dumps({'delta': f' API Error: {e.response.text}'})}\n\n"
-                yield "data: [DONE]\n\n"
             except Exception as e:
                 print(f"STREAM ERROR: {e}")
                 yield f"data: {json.dumps({'delta': ' Sorry, an error occurred while connecting to the AI.'})}\n\n"
@@ -240,5 +247,4 @@ def chat():
 # ==========================================
 
 if __name__ == '__main__':
-    # Run on port 5001 locally
     app.run(host='0.0.0.0', port=5001, debug=True)
