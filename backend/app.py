@@ -3,20 +3,19 @@ import json
 import uuid
 import time
 import requests
-import resend  # NEW: For sending emails via HTTP API
+import resend
 from flask import Flask, request, jsonify, render_template, session, Response, stream_with_context
 from flask_cors import CORS
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 # ==========================================
 # 1. SETUP & CONFIGURATION
 # ==========================================
 
-# Get the absolute path to the backend folder
 base_dir = os.path.dirname(os.path.abspath(__file__))
-# Point to the 'public' folder located one level up (../public)
 template_dir = os.path.join(base_dir, '..', 'public')
 
-# Initialize Flask App
 app = Flask(__name__, template_folder=template_dir, static_folder=template_dir)
 app.secret_key = 'your-super-secret-key-change-this-in-production'
 
@@ -24,7 +23,7 @@ app.secret_key = 'your-super-secret-key-change-this-in-production'
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-# CORS Configuration (Crucial for Netlify -> Render communication)
+
 CORS(app, supports_credentials=True, origins=[
     "https://thinkly5.netlify.app",
     "http://localhost:5001",
@@ -32,18 +31,17 @@ CORS(app, supports_credentials=True, origins=[
 ])
 
 # ==========================================
-# 2. DATABASE HELPERS (JSON based)
+# 2. DATABASE HELPERS
 # ==========================================
 
 USERS_FILE = os.path.join(base_dir, 'users.json')
 RESETS_FILE = os.path.join(base_dir, 'resets.json')
 
 def load_json(filepath):
-    """Robust JSON loader that handles empty files (caused by Render's ephemeral storage)"""
     if os.path.exists(filepath):
         with open(filepath, 'r') as f:
             content = f.read().strip()
-            if not content:  # If file is empty, return empty dict
+            if not content:
                 return {}
             try:
                 return json.loads(content)
@@ -52,7 +50,6 @@ def load_json(filepath):
     return {}
 
 def save_json(filepath, data):
-    """Saves data to a JSON file"""
     with open(filepath, 'w') as f:
         json.dump(data, f, indent=4)
 
@@ -78,14 +75,19 @@ def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    
+
     users = load_json(USERS_FILE)
-    
-    if username in users and users[username]['password'] == password:
-        session['username'] = username
-        session['guest'] = False
-        return jsonify({'username': username}), 200
-    
+
+    if username in users:
+        # Block password login for Google-only accounts
+        if users[username].get('provider') == 'google' and not users[username].get('password'):
+            return jsonify({'error': 'This account uses Google Sign-In. Please use the Google button.'}), 401
+
+        if users[username].get('password') == password:
+            session['username'] = username
+            session['guest'] = False
+            return jsonify({'username': username}), 200
+
     return jsonify({'error': 'Invalid username or password'}), 401
 
 @app.route('/api/register', methods=['POST'])
@@ -93,18 +95,62 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    
+
     users = load_json(USERS_FILE)
-    
+
     if username in users:
         return jsonify({'error': 'Username already exists'}), 400
-        
-    users[username] = {'password': password}
+
+    users[username] = {'password': password, 'provider': 'local'}
     save_json(USERS_FILE, users)
-    
+
     session['username'] = username
     session['guest'] = False
     return jsonify({'username': username}), 201
+
+@app.route('/api/google-login', methods=['POST'])
+def google_login():
+    data = request.json
+    token = data.get('credential')
+
+    if not token:
+        return jsonify({'error': 'Missing Google credential'}), 400
+
+    client_id = os.environ.get('GOOGLE_CLIENT_ID')
+    if not client_id:
+        return jsonify({'error': 'GOOGLE_CLIENT_ID not configured on server'}), 500
+
+    try:
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+
+        email = idinfo.get('email')
+        name = idinfo.get('name', email)
+        picture = idinfo.get('picture', '')
+
+        if not email:
+            return jsonify({'error': 'Google did not return an email'}), 400
+
+        users = load_json(USERS_FILE)
+        if email not in users:
+            users[email] = {
+                'password': None,
+                'provider': 'google',
+                'name': name,
+                'picture': picture,
+            }
+            save_json(USERS_FILE, users)
+
+        session['username'] = email
+        session['guest'] = False
+
+        return jsonify({'username': email, 'name': name, 'picture': picture}), 200
+
+    except ValueError as e:
+        print(f"Google token verification failed: {e}")
+        return jsonify({'error': 'Invalid Google token'}), 401
+    except Exception as e:
+        print(f"Google login error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/guest-login', methods=['POST'])
 def guest_login():
@@ -119,44 +165,40 @@ def logout():
     return jsonify({'message': 'Logged out'}), 200
 
 # ==========================================
-# 4. PASSWORD RESET ROUTES (UPDATED WITH RESEND)
+# 4. PASSWORD RESET ROUTES (RESEND)
 # ==========================================
 
 @app.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.json
-    username = data.get('username') # Assuming username is the email address
-    
+    username = data.get('username')
+
     users = load_json(USERS_FILE)
     if username not in users:
-        # Security: Don't reveal if user exists, just pretend it sent
         return jsonify({'message': 'If an account exists, a reset link has been sent.'}), 200
-        
+
     token = str(uuid.uuid4())
     resets = load_json(RESETS_FILE)
     resets[token] = {'username': username, 'timestamp': time.time()}
     save_json(RESETS_FILE, resets)
-    
-    # Build the reset link pointing to your Netlify frontend
+
     reset_link = f"https://thinkly5.netlify.app/?reset_token={token}"
-    
-    # --- Send email using Resend (HTTP API, bypasses Render SMTP block) ---
+
     try:
         resend.api_key = os.environ.get('RESEND_API_KEY')
         if not resend.api_key:
-            raise ValueError("RESEND_API_KEY is not set in environment variables.")
-            
+            raise ValueError("RESEND_API_KEY is not set.")
+
         resend.Emails.send({
-            "from": "onboarding@resend.dev", # Use this test address until you verify a domain
-            "to": username, # Send to the user's email (username)
+            "from": "onboarding@resend.dev",
+            "to": username,
             "subject": "Reset your Thinkly password",
-            "html": f"<p>Click the link below to reset your password:</p><p><a href='{reset_link}'>Reset Password</a></p><p>If you didn't request this, please ignore this email.</p>"
+            "html": f"<p>Click the link below to reset your password:</p><p><a href='{reset_link}'>Reset Password</a></p>"
         })
         return jsonify({'message': 'Reset link has been sent to your email.'}), 200
-        
+
     except Exception as e:
         print(f"Email sending failed: {e}")
-        # Fallback: return the link in dev mode if sending fails
         return jsonify({
             'message': 'Email sending failed, but here is your reset link.',
             'dev_reset_link': reset_link
@@ -167,26 +209,26 @@ def reset_password():
     data = request.json
     token = data.get('token')
     new_password = data.get('password')
-    
+
     resets = load_json(RESETS_FILE)
     if token not in resets:
         return jsonify({'error': 'Invalid or expired token'}), 400
-        
+
     username = resets[token]['username']
-    
+
     users = load_json(USERS_FILE)
     if username in users:
         users[username]['password'] = new_password
+        users[username]['provider'] = 'local'
         save_json(USERS_FILE, users)
-        
-    # Clean up token
+
     del resets[token]
     save_json(RESETS_FILE, resets)
-    
+
     return jsonify({'message': 'Password updated successfully', 'username': username}), 200
 
 # ==========================================
-# 5. AI CHAT ROUTE (GROQ INTEGRATION)
+# 5. AI CHAT ROUTE (GROQ)
 # ==========================================
 
 @app.route('/api/chat', methods=['POST'])
@@ -195,19 +237,19 @@ def chat():
         data = request.json
         user_message = data.get('message', '')
         persona = data.get('persona', 'You are a helpful, friendly AI assistant.')
-        
+
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
-            return jsonify({'error': 'GROQ_API_KEY is not configured. Please set it in Render Environment Variables.'}), 500
+            return jsonify({'error': 'GROQ_API_KEY is not configured on server.'}), 500
 
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        
+
         payload = {
-            "model": "openai/gpt-oss-120b", # The working model
+            "model": "openai/gpt-oss-120b",
             "messages": [
                 {"role": "system", "content": persona},
                 {"role": "user", "content": user_message}
@@ -237,11 +279,11 @@ def chat():
                                 continue
             except Exception as e:
                 print(f"STREAM ERROR: {e}")
-                yield f"data: {json.dumps({'delta': ' Sorry, an error occurred while connecting to the AI.'})}\n\n"
+                yield f"data: {json.dumps({'delta': ' Sorry, an error occurred.'})}\n\n"
                 yield "data: [DONE]\n\n"
 
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
-        
+
     except Exception as e:
         print(f"CHAT ERROR: {e}")
         return jsonify({'error': str(e)}), 500

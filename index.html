@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#6366f1" />
 <title>Thinkly — Assistant</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236366f1'/%3E%3Cpath d='M32 32h36v9H57v32h-14V41H32z' fill='white'/%3E%3C/svg%3E">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   --bg:#f5f6fb;--bg-2:#eceefb;--surface:#fff;--surface-2:#fff;
@@ -42,8 +43,13 @@ button,textarea,input,select{font:inherit;color:inherit;touch-action:manipulatio
 button{cursor:pointer;border:0;background:none}
 ::selection{background:rgba(var(--brand-rgb),.35);color:#fff}
 
-.aurora-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .6s}
-.aurora-bg.visible{opacity:1}
+.aurora-bg{
+  position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  opacity:0;visibility:hidden;
+  transition:opacity .6s,visibility .6s;
+}
+.aurora-bg.visible{opacity:1;visibility:visible}
+.aurora-bg:not(.visible) .aurora-blob{animation:none}
 .aurora-blob{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(80px);opacity:.35;animation:auroraFloat 18s ease-in-out infinite}
 .aurora-blob:nth-child(1){background:radial-gradient(circle,var(--brand-1),transparent 70%);top:-20%;left:-10%}
 .aurora-blob:nth-child(2){background:radial-gradient(circle,#a855f7,transparent 70%);top:20%;right:-15%;animation-delay:-6s}
@@ -287,11 +293,10 @@ mark.highlight{background:rgba(250,204,21,.4);color:inherit;border-radius:2px;pa
   flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   padding:20px 18px 10px;display:flex;flex-direction:column;gap:14px;
   scroll-behavior:smooth;position:relative;
-  -webkit-overflow-scrolling:touch;
 }
 .chat__body::-webkit-scrollbar{width:7px}
 .chat__body::-webkit-scrollbar-thumb{background:rgba(var(--brand-rgb),.25);border-radius:99px}
-.msg{display:flex;align-items:flex-start;gap:10px;max-width:82%;position:relative;animation:msgIn .4s var(--ease) both}
+.msg{display:flex;align-items:flex-start;gap:10px;max-width:82%;position:relative;animation:msgIn .4s var(--ease) backwards}
 .msg--bot{align-self:flex-start;animation-name:msgInBot}
 .msg--user{align-self:flex-end;flex-direction:row-reverse;animation-name:msgInUser}
 @keyframes msgInBot{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
@@ -488,18 +493,25 @@ kbd{padding:1.5px 6px;font-size:10.5px;color:var(--muted);border-radius:5px;bord
 .sidebar-overlay{
   position:fixed;inset:0;z-index:98;
   background:rgba(15,23,42,.45);
-  opacity:0;pointer-events:none;transition:opacity .25s;
-  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .25s,visibility .25s;
+  -webkit-backdrop-filter:none;backdrop-filter:none;
 }
-.sidebar-overlay.show{opacity:1;pointer-events:auto}
+.sidebar-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+}
 
 .modal-overlay{
   position:fixed;inset:0;z-index:1000;
-  background:rgba(15,23,42,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:grid;place-items:center;opacity:0;pointer-events:none;
-  transition:opacity .3s;padding:16px;overflow-y:auto;
+  background:rgba(15,23,42,.55);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  display:grid;place-items:center;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .3s,visibility .3s;padding:16px;overflow-y:auto;
 }
-.modal-overlay.show{opacity:1;pointer-events:auto}
+.modal-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+}
 .modal{
   background:var(--surface);border:1px solid var(--stroke);border-radius:var(--radius-xl);
   padding:28px 24px;width:100%;max-width:420px;max-height:calc(var(--app-h) - 32px);
@@ -568,14 +580,19 @@ kbd{padding:1.5px 6px;font-size:10.5px;color:var(--muted);border-radius:5px;bord
   font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
 }
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--stroke)}
+.g_id_signin{display:flex;justify-content:center;margin:4px 0}
 
 .cmd-palette-overlay{
   position:fixed;inset:0;z-index:1100;
-  background:rgba(15,23,42,.55);backdrop-filter:blur(8px);
+  background:rgba(15,23,42,.55);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
   display:grid;place-items:start center;padding:15vh 16px 16px;
-  opacity:0;pointer-events:none;transition:opacity .2s;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .2s,visibility .2s;
 }
-.cmd-palette-overlay.show{opacity:1;pointer-events:auto}
+.cmd-palette-overlay.show{
+  opacity:1;visibility:visible;pointer-events:auto;
+}
 .cmd-palette{
   width:100%;max-width:560px;background:var(--surface);
   border:1px solid var(--stroke);border-radius:16px;
@@ -755,7 +772,7 @@ body.zen-mode .chat{grid-column:1}
     padding:16px 18px 12px;
     position:sticky;top:0;z-index:2;
     background:var(--surface-2);
-    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
   }
   .sidebar__brand span{font-size:15px}
 
@@ -770,7 +787,7 @@ body.zen-mode .chat{grid-column:1}
   .chat__header{
     padding:calc(12px + env(safe-area-inset-top,0px)) 14px 12px;
     background:var(--surface-2);
-    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
     position:sticky;top:0;z-index:20;
     min-height:56px;
   }
@@ -785,7 +802,6 @@ body.zen-mode .chat{grid-column:1}
   .chat__body{
     padding:16px 12px 8px;
     gap:12px;
-    -webkit-overflow-scrolling:touch;
   }
   .msg{max-width:92%}
   .bubble{
@@ -804,7 +820,7 @@ body.zen-mode .chat{grid-column:1}
   .composer{
     padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
     background:var(--surface-2);
-    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
     border-top:1px solid var(--stroke-soft);
     position:sticky;bottom:0;z-index:15;
   }
@@ -828,6 +844,17 @@ body.zen-mode .chat{grid-column:1}
   .context-menu-item{padding:12px;font-size:14px}
   .settings-dropdown{min-width:min(300px,calc(100vw - 24px))}
   .settings-item{padding:12px 14px}
+
+  .chat__header,
+  .composer,
+  .sidebar__head,
+  .sidebar-overlay.show,
+  .modal-overlay.show,
+  .cmd-palette-overlay.show,
+  .import-drop{
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+  }
 }
 
 @media (max-width:400px){
@@ -892,6 +919,23 @@ body.zen-mode .chat{grid-column:1}
       <a id="authForgotLink">Forgot password?</a>
     </div>
     <div class="auth-divider">or</div>
+
+    <!-- Google Sign-In -->
+    <div id="g_id_onload"
+         data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"
+         data-callback="handleGoogleCredential"
+         data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="continue_with"
+         data-shape="rectangular"
+         data-logo_alignment="left"
+         data-width="340">
+    </div>
+
     <button class="modal-btn ghost" id="guestBtn">Continue as Guest</button>
     <div class="modal-switch">
       <span id="authSwitchText">Don't have an account?</span>
@@ -1182,8 +1226,11 @@ body.zen-mode .chat{grid-column:1}
 <script>
 (() => {
 'use strict';
+
+// ⚠️ Backend URL — NO trailing slash!
+const BACKEND_URL = 'https://thinkly-backend-hxmh.onrender.com';
 const $ = id => document.getElementById(id);
-const API_ENDPOINT = '/api/chat';
+const API_ENDPOINT = `${BACKEND_URL}/api/chat`;
 const GUEST_KEY = '__guest__';
 
 let currentUser = null;
@@ -1770,7 +1817,8 @@ async function streamMarkdownInto(el, lastUserText, attachments = []) {
         persona: getPersona(),
         images: attachments.map(a => a.dataUrl)
       }),
-      signal
+      signal,
+      credentials: 'include'
     }).then(async res => {
       if (res.status === 401) { setError('Session expired.'); showAuthModal(); return; }
       if (!res.ok) { setError('HTTP ' + res.status); return; }
@@ -2704,7 +2752,7 @@ $('sendBtn').addEventListener('click', () => handleSend());
 function autoGrow() { $('input').style.height = 'auto'; $('input').style.height = Math.min($('input').scrollHeight, 140) + 'px'; }
 function syncSendButton() { $('sendBtn').disabled = isBusy || ($('input').value.trim().length === 0 && pendingAttachments.length === 0); }
 
-ThinklyGreeting() {
+async function bootGreeting() {
   isBusy = true;
   const typing = showTyping();
   await wait(500);
@@ -3000,7 +3048,6 @@ window.addEventListener('offline', updateNet);
 let isRegisterMode = false;
 
 function showAuthModal() {
-  if (currentUser && !isGuest) return;
   $('authModal').classList.add('show');
   $('auroraBg').classList.add('visible');
   if (typeof resetAuthPasswordVisibility === 'function') resetAuthPasswordVisibility();
@@ -3029,10 +3076,11 @@ $('authSubmitBtn').addEventListener('click', async () => {
   $('authSubmitBtn').textContent = 'Please wait...';
   $('authError').textContent = '';
   try {
-    const res = await fetch(isRegisterMode ? '/api/register' : '/api/login', {
+    const res = await fetch(`${BACKEND_URL}${isRegisterMode ? '/api/register' : '/api/login'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p })
+      body: JSON.stringify({ username: u, password: p }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { $('authError').textContent = data.error || 'Authentication failed'; return; }
@@ -3073,10 +3121,11 @@ $('forgotSubmitBtn').addEventListener('click', async () => {
   $('forgotSubmitBtn').disabled = true;
   $('forgotSubmitBtn').textContent = 'Sending...';
   try {
-    const res = await fetch('/api/forgot-password', {
+    const res = await fetch(`${BACKEND_URL}/api/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u })
+      body: JSON.stringify({ username: u }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -3150,10 +3199,11 @@ $('resetSubmitBtn').addEventListener('click', async () => {
   }
 
   try {
-    const res = await fetch('/api/reset-password', {
+    const res = await fetch(`${BACKEND_URL}/api/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: p1 })
+      body: JSON.stringify({ token, password: p1 }),
+      credentials: 'include'
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -3220,7 +3270,10 @@ $('guestBtn').addEventListener('click', async () => {
   btn.textContent = 'Starting guest session…';
 
   try {
-    const res = await fetch('/api/guest-login', { method: 'POST' });
+    const res = await fetch(`${BACKEND_URL}/api/guest-login`, { 
+      method: 'POST',
+      credentials: 'include'
+    });
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -3269,7 +3322,7 @@ $('logoutBtn').addEventListener('click', async () => {
     ? 'Sign out of guest mode?'
     : 'Sign out? Account chats are saved to your account.';
   if (!confirm(msg)) return;
-  try { await fetch('/api/logout', { method: 'POST' }); } catch(e){}
+  try { await fetch(`${BACKEND_URL}/api/logout`, { method: 'POST', credentials: 'include' }); } catch(e){}
   currentUser = null;
   isGuest = false;
   try { localStorage.removeItem('thinkly-lastmode'); } catch(e){}
@@ -3282,7 +3335,9 @@ $('logoutBtn').addEventListener('click', async () => {
 
 async function checkAuth() {
   try {
-    const res = await fetch('/api/me');
+    const res = await fetch(`${BACKEND_URL}/api/me`, {
+      credentials: 'include'
+    });
     if (res.ok) {
       const data = await res.json();
       currentUser = data.username;
@@ -3294,7 +3349,7 @@ async function checkAuth() {
       updateModeBadge();
       return true;
     }
-  } catch(e){}
+  } catch(e){ console.error('Auth check failed:', e); }
   return false;
 }
 
@@ -3442,29 +3497,57 @@ document.addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// BOOT — handles reset_token FIRST (opens modal immediately)
+// Google Sign-In callback
 // ═══════════════════════════════════════════════════════════════
-Thinkly() {
+window.handleGoogleCredential = async (response) => {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/google-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      $('authError').textContent = data.error || 'Google login failed';
+      return;
+    }
+    currentUser = data.username;
+    isGuest = false;
+    try { localStorage.setItem('thinkly-lastmode', 'user'); } catch(e){}
+    $('userNameDisplay').textContent = data.name || data.username;
+    $('userStatusDisplay').textContent = 'Online';
+    $('userProfile').style.display = 'flex';
+    updateModeBadge();
+    hideAuthModal();
+    loadFromStorage();
+    ensureActive();
+    renderSidebar();
+    if (getActive()) renderConversation(getActive());
+    showToast('Welcome!', data.name || data.username, 'success');
+  } catch (e) {
+    console.error('Google login error:', e);
+    $('authError').textContent = 'Connection error. Please try again.';
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+async function boot() {
   const params = new URLSearchParams(location.search);
   const resetTokenFromUrl = params.get('reset_token');
 
-  // 1) PASSWORD RESET — Show modal IMMEDIATELY
   if (resetTokenFromUrl) {
-    console.log('[Thinkly boot] Reset token found, opening Reset Password modal');
     window.__resetToken = resetTokenFromUrl;
-
-    // Hide all other modals first
     document.querySelectorAll('.modal-overlay.show').forEach(el => el.classList.remove('show'));
-
     $('resetModal').classList.add('show');
     $('auroraBg').classList.add('visible');
     $('resetError').textContent = '';
     $('resetSuccess').textContent = '';
     $('resetPassword').value = '';
     $('resetPassword2').value = '';
-
     try { history.replaceState({}, '', '/'); } catch(e) {}
-
     try {
       currentUser = GUEST_KEY;
       isGuest = true;
@@ -3472,14 +3555,12 @@ Thinkly() {
       ensureActive();
       renderSidebar();
       if (getActive()) renderConversation(getActive());
-    } catch(e) { console.error('[Thinkly boot] Background prep failed:', e); }
-
+    } catch(e) { console.error('Background prep failed:', e); }
     setTimeout(() => $('resetPassword').focus(), 400);
     setTimeout(updateNet, 500);
     return;
   }
 
-  // 2) SHARED CONVERSATION
   const share = params.get('share');
   if (share) {
     try {
@@ -3505,7 +3586,6 @@ Thinkly() {
     } catch(e) { history.replaceState({}, '', '/'); }
   }
 
-  // 3) NORMAL AUTH
   const authed = await checkAuth();
   if (authed) {
     try { localStorage.setItem('thinkly-lastmode', isGuest ? 'guest' : 'user'); } catch(e){}
