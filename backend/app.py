@@ -36,7 +36,13 @@ RESETS_FILE = os.path.join(base_dir, 'resets.json')
 def load_json(filepath):
     if os.path.exists(filepath):
         with open(filepath, 'r') as f:
-            return json.load(f)
+            content = f.read().strip()
+            if not content:  # If the file is empty, return an empty dict
+                return {}
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return {}
     return {}
 
 def save_json(filepath, data):
