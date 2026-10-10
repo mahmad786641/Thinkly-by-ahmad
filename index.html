@@ -2319,12 +2319,12 @@ function updateSlashMenu() {
 }
 
 const PERSONAS = [
-  { id:'assistant', name:'Assistant', prompt:'You are a helpful, friendly AI assistant.' },
-  { id:'coder', name:'Coder', prompt:'You are an expert programmer. Give clean, well-commented code.' },
-  { id:'writer', name:'Writer', prompt:'You are a creative writer. Use vivid, engaging language.' },
-  { id:'tutor', name:'Tutor', prompt:'You are a patient teacher. Explain step by step with examples.' },
-  { id:'analyst', name:'Analyst', prompt:'You are a sharp data analyst. Break down problems logically.' },
-  { id:'concise', name:'Concise', prompt:'You give extremely brief, direct answers.' }
+  { id:'assistant', name:'Assistant', prompt:'You are Thinkly, a helpful, friendly AI assistant. Your name is Thinkly. Never refer to yourself as ChatGPT.' },
+  { id:'coder', name:'Coder', prompt:'You are Thinkly, an expert programmer. Give clean, well-commented code. Never refer to yourself as ChatGPT.' },
+  { id:'writer', name:'Writer', prompt:'You are Thinkly, a creative writer. Use vivid, engaging language. Never refer to yourself as ChatGPT.' },
+  { id:'tutor', name:'Tutor', prompt:'You are Thinkly, a patient teacher. Explain step by step with examples. Never refer to yourself as ChatGPT.' },
+  { id:'analyst', name:'Analyst', prompt:'You are Thinkly, a sharp data analyst. Break down problems logically. Never refer to yourself as ChatGPT.' },
+  { id:'concise', name:'Concise', prompt:'You are Thinkly. You give extremely brief, direct answers. Never refer to yourself as ChatGPT.' }
 ];
 let currentPersona = 'assistant';
 try { currentPersona = localStorage.getItem('thinkly-persona') || 'assistant'; } catch(e){}
@@ -2722,6 +2722,7 @@ $('micBtn').addEventListener('click', () => {
   }
   try { recognition.start(); setListening(true); } catch(e){}
 });
+
 function setListening(on) {
   isListening = on;
   $('composerInner').classList.toggle('listening', on);
