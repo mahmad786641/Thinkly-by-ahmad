@@ -7,7 +7,7 @@ import logging
 import hashlib
 import secrets
 import smtplib
-import importlib.util          # ← ADDED for the fix below
+import importlib.util
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from email.mime.text import MIMEText
@@ -34,6 +34,7 @@ def send_reset_email(to_email, reset_link):
     except Exception as e:
         log.exception("Resend send failed")
         return False, str(e)
+
 # ------------------------------------------------------------
 # Logging
 # ------------------------------------------------------------
@@ -190,7 +191,13 @@ def reset_expiry_str(minutes=30):
 # ------------------------------------------------------------
 # System prompt / limits
 # ------------------------------------------------------------
-SYSTEM_PROMPT = """You are Thinkly, a friendly, concise AI assistant.
+# ✅ FIXED: Strict instruction added so the AI never calls itself ChatGPT
+SYSTEM_PROMPT =  """You are Thinkly, a friendly, concise AI assistant.
+CRITICAL RULES:
+- Your name is STRICTLY Thinkly. You must NEVER refer to yourself as ChatGPT, OpenAI, or any other AI model.
+- If asked "what is your name", you must answer "I am Thinkly".
+- Do not acknowledge being based on other models.
+
 Style guidelines:
 - Use markdown formatting where it helps.
 - Keep replies focused.
@@ -200,7 +207,7 @@ Style guidelines:
 - If the user asks you to continue a previous response, continue exactly where you left off. Do not repeat yourself."""
 
 MAX_HISTORY_MESSAGES = 20
-MAX_CHARS_PER_MSG    = 1000
+MAX_CHARS_PER_MSG    = 1000                     
 MAX_CHARS_USER       = 3000
 MAX_OUTPUT_TOKENS    = 2000
 RESET_TOKEN_MINUTES  = 30

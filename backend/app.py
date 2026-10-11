@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, render_template, session, Response, s
 from flask_cors import CORS
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from config import SYSTEM_PROMPT  # <-- Added this import
 
 # ==========================================
 # 1. SETUP & CONFIGURATION
@@ -79,7 +80,6 @@ def login():
     users = load_json(USERS_FILE)
 
     if username in users:
-        # Block password login for Google-only accounts
         if users[username].get('provider') == 'google' and not users[username].get('password'):
             return jsonify({'error': 'This account uses Google Sign-In. Please use the Google button.'}), 401
 
@@ -236,7 +236,9 @@ def chat():
     try:
         data = request.json
         user_message = data.get('message', '')
-        persona = data.get('persona', 'You are a helpful, friendly AI assistant.')
+        
+        # ✅ FIXED: Now strictly uses SYSTEM_PROMPT from config.py
+        persona = SYSTEM_PROMPT 
 
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
